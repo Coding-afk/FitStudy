@@ -1,0 +1,40 @@
+# =========================
+# React Native / Node
+# =========================
+frontend/node_modules/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/.metro-health-check*
+npm-debug.log*
+
+# =========================
+# Python
+# =========================
+backend/.venv/
+.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+*.pyc
+
+# =========================
+# Secrets
+# =========================
+.env
+backend/.env
+frontend/.env
+backend/secrets/
+backend/serviceAccountKey.json
+*service-account*.json
+*firebase-admin*.json
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Operating system
+# =========================
+Thumbs.db
+.DS_Store
