@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.core.firebase import db
 
 app = FastAPI(
     title="FitStudy API",
@@ -19,4 +20,16 @@ def home():
 def health():
     return {
         "status": "ok"
+    }
+
+@app.get("/health/firebase")
+def firebase_health():
+    db.collection("system").document("health").set(
+        {
+            "status": "ok"
+        }
+    )
+
+    return {
+        "firebase": "connected"
     }
