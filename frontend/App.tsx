@@ -1,44 +1,79 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useState } from 'react';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { Button, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+
+import { auth } from './src/config/firebase';
+import { loginUser, registerUser } from './src/services/auth';
+
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [message, setMessage] = useState('Ready');
+
+  const testRegistration = async () => {
+    try {
+      const result = await registerUser(
+        'fitstudytest@example.com',
+        'Test123456!',
+      );
+
+      setMessage(`Registered: ${result.user.uid}`);
+    } catch (error) {
+      console.log(error);
+
+      setMessage('Registration failed');
+    }
+  };
+  const testLogin = async () => {
+    try {
+      const result = await loginUser('fitstudytest@example.com', 'Test123456!');
+
+      setMessage(`Logged in: ${result.user.uid}`);
+    } catch (error) {
+      console.log(error);
+
+      setMessage('Login failed');
+    }
+  };
+
+  const testToken = async () => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
+      setMessage('No user is currently logged in');
+      return;
+    }
+
+    const token = await user.getIdToken();
+
+    if (token) {
+      setMessage('Firebase ID token received');
+    }
+  } catch (error) {
+    console.log(error);
+
+    setMessage('Could not get Firebase ID token');
+  }
+};
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
+    <SafeAreaView style={styles.container}>
+      <View>
+        <Text>{message}</Text>
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
+        <Button title="Test Firebase Registration" onPress={testRegistration} />
+        <Button title="Test Login" onPress={testLogin} />
+        <Button title="Test ID Token" onPress={testToken} />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
