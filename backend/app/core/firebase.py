@@ -11,12 +11,17 @@ SERVICE_ACCOUNT_PATH = (
 )
 
 
-if not firebase_admin._apps:
+try:
+    firebase_app = firebase_admin.get_app()
+
+except ValueError:
     cred = credentials.Certificate(
         SERVICE_ACCOUNT_PATH
     )
 
-    firebase_admin.initialize_app(cred)
+    firebase_app = firebase_admin.initialize_app(
+        cred
+    )
 
 
 db = firestore.client()

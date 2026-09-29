@@ -1,35 +1,25 @@
-from fastapi import FastAPI
-from app.core.firebase import db
+from fastapi import Depends, FastAPI
+
+from app.core.auth import get_current_user
+
 
 app = FastAPI(
     title="FitStudy API",
-    description="Backend API for FitStudy",
-    version="1.0.0"
 )
-
-
-@app.get("/")
-def home():
-    return {
-        "application": "FitStudy API",
-        "message": "Backend is running"
-    }
 
 
 @app.get("/health")
 def health():
     return {
-        "status": "ok"
+        "status": "ok",
     }
 
-@app.get("/health/firebase")
-def firebase_health():
-    db.collection("system").document("health").set(
-        {
-            "status": "ok"
-        }
-    )
 
+@app.get("/protected")
+def protected_route(
+    user=Depends(get_current_user),
+):
     return {
-        "firebase": "connected"
+        "message": "Authenticated",
+        "uid": user["uid"],
     }
