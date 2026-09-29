@@ -8,7 +8,7 @@ function App() {
       <View>
         <Text style={styles.title}>FitStudy</Text>
 
-        <Text style={styles.text}>Welcome to FitStudy</Text>
+        <Text style={styles.text}>Welcome to FitStudy. I hope you have a great day!</Text>
       </View>
     </SafeAreaView>
   );
