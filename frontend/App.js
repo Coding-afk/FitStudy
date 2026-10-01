@@ -11,7 +11,7 @@ function App() {
         <Text style={styles.subtitle}>Welcome to FitStudy</Text>
 
         <Text style={styles.text}>
-          Your fitness study application is ready for development.
+          Hope you enjoy your time here!
         </Text>
       </View>
     </SafeAreaView>
