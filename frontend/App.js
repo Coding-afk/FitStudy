@@ -4,32 +4,45 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
         <Text style={styles.title}>FitStudy</Text>
 
-        <Text style={styles.text}>Welcome to FitStudy. I hope you have a great day!</Text>
+        <Text style={styles.subtitle}>Welcome to FitStudy</Text>
+
+        <Text style={styles.text}>
+          Your fitness study application is ready for development.
+        </Text>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
   },
 
   title: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    textAlign: 'center',
     marginBottom: 12,
   },
 
+  subtitle: {
+    fontSize: 20,
+    marginBottom: 10,
+  },
+
   text: {
-    fontSize: 18,
+    fontSize: 16,
     textAlign: 'center',
   },
 });
