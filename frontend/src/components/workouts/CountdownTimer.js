@@ -1,21 +1,59 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import Sound from 'react-native-sound';
+
 import { COLORS } from '../../constants/theme';
+
+Sound.setCategory('Playback');
 
 function CountdownTimer({ targetSeconds }) {
   const [seconds, setSeconds] = useState(targetSeconds);
 
   const [running, setRunning] = useState(false);
 
+  const soundRef = useRef(null);
+
+  useEffect(() => {
+    const sound = new Sound(
+      'timer_complete.mp3',
+      Sound.MAIN_BUNDLE,
+
+      error => {
+        if (error) {
+          console.log('Unable to load timer sound:', error);
+
+          return;
+        }
+
+        soundRef.current = sound;
+      },
+    );
+
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.release();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setSeconds(targetSeconds);
+
     setRunning(false);
   }, [targetSeconds]);
 
-  // Countdown logic
+  const playFinishedSound = () => {
+    if (!soundRef.current) {
+      return;
+    }
+
+    soundRef.current.stop(() => {
+      soundRef.current.play();
+    });
+  };
+
   useEffect(() => {
     if (!running) {
       return;
@@ -25,7 +63,10 @@ function CountdownTimer({ targetSeconds }) {
       setSeconds(previous => {
         if (previous <= 1) {
           clearInterval(timer);
+
           setRunning(false);
+
+          playFinishedSound();
 
           return 0;
         }
@@ -41,6 +82,7 @@ function CountdownTimer({ targetSeconds }) {
 
   const resetTimer = () => {
     setSeconds(targetSeconds);
+
     setRunning(false);
   };
 
@@ -76,9 +118,11 @@ function CountdownTimer({ targetSeconds }) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+
     alignItems: 'center',
 
     marginTop: 8,
+
     marginBottom: 10,
   },
 
@@ -86,6 +130,7 @@ const styles = StyleSheet.create({
     flex: 1,
 
     alignItems: 'center',
+
     justifyContent: 'center',
   },
 
@@ -93,15 +138,17 @@ const styles = StyleSheet.create({
     color: COLORS.text,
 
     fontSize: 16,
+
     fontWeight: 'bold',
 
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
 
   startButton: {
     backgroundColor: COLORS.primary,
 
     paddingVertical: 8,
+
     paddingHorizontal: 16,
 
     borderRadius: 8,
@@ -121,6 +168,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardSecondary,
 
     paddingVertical: 8,
+
     paddingHorizontal: 16,
 
     borderRadius: 8,

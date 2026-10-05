@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -58,11 +59,13 @@ const getApiErrorMessage = error => {
 
 function NonGamifiedWorkoutScreen({
   // TODO:
-  // Replace the temporary default once Group 1
-  // supplies workoutId through navigation/assignment data.
+  // Replace this temporary default with
+  // Group 1's assignment/navigation workoutId.
   workoutId = 'W001',
 
   onCompleteWorkout = () => {},
+
+  onDiscardWorkout = () => {},
 }) {
   const [workout, setWorkout] = useState(null);
 
@@ -223,12 +226,16 @@ function NonGamifiedWorkoutScreen({
 
       completionTimeSeconds,
 
+      completedSets,
+
+      totalSets,
+
       exerciseResults,
     };
   };
 
-  const handleCompleteWorkout = async () => {
-    if (!allSetsCompleted || saving) {
+  const saveAndCompleteWorkout = async () => {
+    if (saving) {
       return;
     }
 
@@ -268,6 +275,50 @@ function NonGamifiedWorkoutScreen({
     }
   };
 
+  const handleCompleteWorkout = () => {
+    if (allSetsCompleted) {
+      saveAndCompleteWorkout();
+
+      return;
+    }
+
+    Alert.alert(
+      'Incomplete Workout',
+      `You have completed ${completedSets} of ${totalSets} sets. Are you sure you want to complete the workout?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+
+        {
+          text: 'Complete Anyway',
+          onPress: saveAndCompleteWorkout,
+        },
+      ],
+    );
+  };
+
+  const handleDiscardWorkout = () => {
+    Alert.alert(
+      'Discard Workout',
+      'Are you sure you want to discard this workout? Your current workout progress will not be saved.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+
+        {
+          text: 'Discard',
+          style: 'destructive',
+
+          onPress: onDiscardWorkout,
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer}>
@@ -304,7 +355,6 @@ function NonGamifiedWorkoutScreen({
           totalSets={totalSets}
         />
 
-
         {workout.exerciseList.map(exercise => (
           <ExerciseCard
             key={exercise.exerciseId}
@@ -337,9 +387,9 @@ function NonGamifiedWorkoutScreen({
           style={[
             styles.completeWorkoutButton,
 
-            (!allSetsCompleted || saving) && styles.completeWorkoutDisabled,
+            saving && styles.disabledButton,
           ]}
-          disabled={!allSetsCompleted || saving}
+          disabled={saving}
           onPress={handleCompleteWorkout}
         >
           <Text style={styles.completeWorkoutText}>
@@ -347,11 +397,13 @@ function NonGamifiedWorkoutScreen({
           </Text>
         </Pressable>
 
-        {!allSetsCompleted && (
-          <Text style={styles.helperText}>
-            Complete every set before finishing the workout.
-          </Text>
-        )}
+        <Pressable
+          style={styles.discardWorkoutButton}
+          disabled={saving}
+          onPress={handleDiscardWorkout}
+        >
+          <Text style={styles.discardWorkoutText}>Discard Workout</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -389,11 +441,11 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
 
-
   errorText: {
     color: COLORS.text,
 
     fontSize: 16,
+
     textAlign: 'center',
 
     marginBottom: 20,
@@ -432,13 +484,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
 
     alignItems: 'center',
-    justifyContent: 'center',
 
     marginTop: 8,
   },
 
-  completeWorkoutDisabled: {
-    opacity: 0.4,
+  disabledButton: {
+    opacity: 0.5,
   },
 
   completeWorkoutText: {
@@ -448,13 +499,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  helperText: {
-    color: COLORS.textSecondary,
+  discardWorkoutButton: {
+    borderWidth: 1,
 
-    fontSize: 13,
-    textAlign: 'center',
+    borderColor: '#C65A5A',
 
-    marginTop: 10,
+    paddingVertical: 15,
+
+    borderRadius: 14,
+
+    alignItems: 'center',
+
+    marginTop: 12,
+  },
+
+  discardWorkoutText: {
+    color: '#FF7070',
+
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
