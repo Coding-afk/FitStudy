@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import {
   Pressable,
@@ -12,17 +12,13 @@ import {
 import { COLORS } from '../../constants/theme';
 
 function WorkoutSummaryScreen({ summary, onDone }) {
-  console.log('SUMMARY SCREEN RECEIVED:', summary);
+  const [expanded, setExpanded] = useState(false);
 
   if (!summary) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyContainer}>
+        <View style={styles.centerContainer}>
           <Text style={styles.title}>No workout summary available.</Text>
-
-          <Pressable style={styles.doneButton} onPress={onDone}>
-            <Text style={styles.doneText}>Go Back</Text>
-          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -36,6 +32,21 @@ function WorkoutSummaryScreen({ summary, onDone }) {
 
   const exerciseResults = summary.exerciseResults ?? [];
 
+  const totalSets =
+    summary.totalSets ??
+    exerciseResults.reduce(
+      (total, exercise) => total + (exercise.sets ?? []).length,
+      0,
+    );
+
+  const completedSets =
+    summary.completedSets ??
+    exerciseResults.reduce(
+      (total, exercise) =>
+        total + (exercise.sets ?? []).filter(set => set.completed).length,
+      0,
+    );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -44,32 +55,53 @@ function WorkoutSummaryScreen({ summary, onDone }) {
       >
         <Text style={styles.title}>Workout Complete</Text>
 
-        <Text style={styles.workoutName}>
-          {summary.workoutName ?? 'Workout'}
-        </Text>
-
-        <Text style={styles.time}>
-          Time: {minutes}m {seconds}s
-        </Text>
-
-        {exerciseResults.length === 0 ? (
-          <Text style={styles.message}>No exercise results available.</Text>
-        ) : (
-          exerciseResults.map(exercise => (
-            <View key={exercise.exerciseId} style={styles.card}>
-              <Text style={styles.exerciseName}>
-                {exercise.name ?? 'Exercise'}
+        <Pressable
+          style={styles.summaryCard}
+          onPress={() => setExpanded(previous => !previous)}
+        >
+          <View style={styles.summaryTopRow}>
+            <View style={styles.summaryText}>
+              <Text style={styles.workoutName}>
+                {summary.workoutName ?? 'Workout'}
               </Text>
 
-              {(exercise.sets ?? []).map(set => (
-                <Text key={set.setNumber} style={styles.setText}>
-                  Set {set.setNumber}: {set.actualValue}{' '}
-                  {exercise.unit === 'seconds' ? 'sec' : 'reps'}
-                </Text>
+              <Text style={styles.quickSummary}>
+                {completedSets}/{totalSets} sets
+                {'  •  '}
+                {minutes}m {seconds}s
+              </Text>
+            </View>
+
+            <Text style={styles.arrow}>{expanded ? '▲' : '▼'}</Text>
+          </View>
+
+          {expanded && (
+            <View style={styles.detailsContainer}>
+              {exerciseResults.map(exercise => (
+                <View key={exercise.exerciseId} style={styles.exerciseSection}>
+                  <Text style={styles.exerciseName}>
+                    {exercise.name ?? 'Exercise'}
+                  </Text>
+
+                  {(exercise.sets ?? []).map(set => (
+                    <Text
+                      key={set.setNumber}
+                      style={[
+                        styles.setText,
+
+                        !set.completed && styles.incompleteSet,
+                      ]}
+                    >
+                      Set {set.setNumber}: {set.actualValue}{' '}
+                      {exercise.unit === 'seconds' ? 'sec' : 'reps'}
+                      {!set.completed ? ' — not completed' : ''}
+                    </Text>
+                  ))}
+                </View>
               ))}
             </View>
-          ))
-        )}
+          )}
+        </Pressable>
 
         <Pressable style={styles.doneButton} onPress={onDone}>
           <Text style={styles.doneText}>Done</Text>
@@ -92,7 +124,7 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
   },
 
-  emptyContainer: {
+  centerContainer: {
     flex: 1,
 
     justifyContent: 'center',
@@ -104,63 +136,94 @@ const styles = StyleSheet.create({
     color: COLORS.text,
 
     fontSize: 30,
+
     fontWeight: 'bold',
 
-    marginBottom: 10,
+    marginBottom: 22,
+  },
+
+  summaryCard: {
+    backgroundColor: COLORS.card,
+
+    borderRadius: 16,
+
+    borderWidth: 1,
+
+    borderColor: COLORS.border,
+
+    padding: 18,
+  },
+
+  summaryTopRow: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'space-between',
+  },
+
+  summaryText: {
+    flex: 1,
   },
 
   workoutName: {
-    color: COLORS.primaryLight,
+    color: COLORS.text,
 
-    fontSize: 20,
+    fontSize: 19,
 
-    marginBottom: 8,
+    fontWeight: 'bold',
+
+    marginBottom: 5,
   },
 
-  time: {
+  quickSummary: {
     color: COLORS.textSecondary,
 
-    fontSize: 16,
-
-    marginBottom: 24,
+    fontSize: 14,
   },
 
-  card: {
-    backgroundColor: COLORS.card,
+  arrow: {
+    color: COLORS.primaryLight,
 
-    borderRadius: 14,
+    fontSize: 18,
 
-    padding: 18,
+    marginLeft: 15,
+  },
 
-    marginBottom: 14,
+  detailsContainer: {
+    marginTop: 18,
 
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    paddingTop: 16,
+
+    borderTopWidth: 1,
+
+    borderTopColor: COLORS.border,
+  },
+
+  exerciseSection: {
+    marginBottom: 18,
   },
 
   exerciseName: {
     color: COLORS.text,
 
-    fontSize: 19,
+    fontSize: 17,
+
     fontWeight: 'bold',
 
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   setText: {
     color: COLORS.textSecondary,
 
-    fontSize: 15,
+    fontSize: 14,
 
     marginBottom: 5,
   },
 
-  message: {
-    color: COLORS.textSecondary,
-
-    fontSize: 15,
-
-    marginBottom: 20,
+  incompleteSet: {
+    opacity: 0.55,
   },
 
   doneButton: {
@@ -172,13 +235,14 @@ const styles = StyleSheet.create({
 
     alignItems: 'center',
 
-    marginTop: 10,
+    marginTop: 20,
   },
 
   doneText: {
     color: COLORS.text,
 
     fontSize: 17,
+
     fontWeight: 'bold',
   },
 });
