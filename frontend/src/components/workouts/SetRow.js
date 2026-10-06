@@ -4,36 +4,46 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '../../constants/theme';
 
+import CountdownTimer from './CountdownTimer';
+
 function SetRow({ set, unit, onDecrease, onIncrease, onToggleComplete }) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.setNumber}>{set.setNumber}</Text>
+    <View>
+      <View style={styles.row}>
+        <Text style={styles.setNumber}>{set.setNumber}</Text>
 
-      <View style={styles.repControls}>
-        <Pressable style={styles.repButton} onPress={onDecrease}>
-          <Text style={styles.repButtonText}>−</Text>
-        </Pressable>
+        <View style={styles.repControls}>
+          <Pressable style={styles.repButton} onPress={onDecrease}>
+            <Text style={styles.repButtonText}>−</Text>
+          </Pressable>
 
-        <Text style={styles.repValue} numberOfLines={1}>
-          {set.value}
-          {unit === 'seconds' ? ' sec' : ''}
-        </Text>
+          <Text style={styles.repValue} numberOfLines={1}>
+            {set.value}
+            {unit === 'seconds' ? ' sec' : ''}
+          </Text>
 
-        <Pressable style={styles.repButton} onPress={onIncrease}>
-          <Text style={styles.repButtonText}>+</Text>
+          <Pressable style={styles.repButton} onPress={onIncrease}>
+            <Text style={styles.repButtonText}>+</Text>
+          </Pressable>
+        </View>
+
+        <Pressable
+          style={[
+            styles.completeButton,
+
+            set.completed && styles.completeButtonActive,
+          ]}
+          onPress={onToggleComplete}
+        >
+          <Text style={styles.completeText}>{set.completed ? '✓' : '○'}</Text>
         </Pressable>
       </View>
 
-      <Pressable
-        style={[
-          styles.completeButton,
-
-          set.completed && styles.completeButtonActive,
-        ]}
-        onPress={onToggleComplete}
-      >
-        <Text style={styles.completeText}>{set.completed ? '✓' : '○'}</Text>
-      </Pressable>
+      {unit === 'seconds' && (
+        <CountdownTimer 
+          targetSeconds={set.value}
+        />
+      )}
     </View>
   );
 }

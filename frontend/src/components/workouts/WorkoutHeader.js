@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '../../constants/theme';
 
-function WorkoutHeader({ workout }) {
+function WorkoutHeader({ workout, completedSets, totalSets }) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{workout.name}</Text>
@@ -13,8 +13,12 @@ function WorkoutHeader({ workout }) {
 
       <View style={styles.details}>
         <Text style={styles.detailText}>{workout.difficulty}</Text>
-        
+
         <Text style={styles.detailText}>{workout.durationMinutes} min</Text>
+
+        <Text style={styles.progressText}>
+          {completedSets}/{totalSets} sets completed
+        </Text>
       </View>
     </View>
   );
@@ -45,11 +49,19 @@ const styles = StyleSheet.create({
 
   details: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
   },
 
   detailText: {
     color: COLORS.primaryLight,
+
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  progressText: {
+    color: COLORS.textSecondary,
 
     fontSize: 14,
     fontWeight: '600',

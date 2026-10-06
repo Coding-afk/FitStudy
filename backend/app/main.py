@@ -3,11 +3,16 @@ from fastapi import Depends, FastAPI
 from app.core.auth import get_current_user
 from app.api.routes import workouts
 
+from app.api.routes import (
+    workout_results,
+)
+
 
 app = FastAPI(
     title="FitStudy API",
 )
 app.include_router(workouts.router)
+app.include_router(workout_results.router)
 
 @app.get("/health")
 def health():
