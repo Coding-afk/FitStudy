@@ -13,9 +13,10 @@ class SetResult(BaseModel):
 class ExerciseResult(BaseModel):
     exerciseId: str
     name: str
+
     unit: Literal[
         "reps",
-        "seconds"
+        "seconds",
     ]
 
     sets: list[SetResult]
@@ -26,7 +27,7 @@ class WorkoutResultCreate(BaseModel):
 
     condition: Literal[
         "non-gamified",
-        "gamified"
+        "gamified",
     ]
 
     startedAt: datetime
@@ -34,4 +35,6 @@ class WorkoutResultCreate(BaseModel):
 
     completionTimeSeconds: int
 
-    exerciseResults: list[ExerciseResult]
+    exerciseResults: list[
+        ExerciseResult
+    ]

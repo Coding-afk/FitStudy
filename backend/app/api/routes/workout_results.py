@@ -2,6 +2,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    status,
 )
 
 from firebase_admin import firestore
@@ -16,6 +17,11 @@ from app.models.workout_result import (
     WorkoutResultCreate,
 )
 
+from app.services.gamification import (
+    get_set_counts,
+    process_gamified_workout,
+)
+
 
 router = APIRouter(
     prefix="/workout-results",
@@ -23,28 +29,31 @@ router = APIRouter(
 )
 
 
-@router.post("")
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+)
 def create_workout_result(
     result: WorkoutResultCreate,
 
-    user=Depends(
+    current_user: dict = Depends(
         get_current_user
     ),
 ):
-    uid = user["uid"]
+    user_id = current_user["uid"]
 
-    
 
     # TODO:
-    # Replace this temporary result ID with assignmentId
-    # once Group 1's assignment flow is integrated.
+    # Replace this temporary result ID
+    # with assignmentId once Group 1's
+    # assignment flow is integrated.
     #
-    # Each workout completion should eventually belong
-    # to a specific workoutAssignment rather than only
-    # userId + workoutId + condition.
-    
+    # Each workout result should
+    # eventually belong to one specific
+    # workoutAssignment.
+
     result_id = (
-        f"{uid}_"
+        f"{user_id}_"
         f"{result.workoutId}_"
         f"{result.condition}"
     )
@@ -58,95 +67,234 @@ def create_workout_result(
     )
 
 
-    if result_ref.get().exists:
-        raise HTTPException(
-            status_code=409,
+    # --------------------------------------------------------
+    # PREVENT DUPLICATE RESULT
+    # --------------------------------------------------------
 
-            detail=(
-                "Workout result "
-                "already exists"
-            ),
+    existing_result = (
+        result_ref.get()
+    )
+
+    if existing_result.exists:
+        raise HTTPException(
+            status_code=
+                status.HTTP_409_CONFLICT,
+
+            detail=
+                "A result already exists "
+                "for this workout and "
+                "condition.",
         )
 
+
+    # --------------------------------------------------------
+    # CHECK USER EXISTS
+    # --------------------------------------------------------
 
     user_ref = (
         db.collection("users")
-        .document(uid)
+        .document(user_id)
     )
 
+    user_document = (
+        user_ref.get()
+    )
 
-    if not user_ref.get().exists:
+    if not user_document.exists:
         raise HTTPException(
-            status_code=400,
+            status_code=
+                status.HTTP_404_NOT_FOUND,
 
-            detail=(
-                "User profile "
-                "not found"
-            ),
+            detail=
+                "User profile not found.",
         )
 
 
-    result_ref.set({
+    # --------------------------------------------------------
+    # CALCULATE GENERAL WORKOUT STATS
+    # --------------------------------------------------------
+
+    completed_sets, total_sets = (
+        get_set_counts(
+            result.exerciseResults
+        )
+    )
+
+    fully_completed = (
+        total_sets > 0
+        and completed_sets
+        == total_sets
+    )
+
+
+    # --------------------------------------------------------
+    # BASIC RESULT DATA
+    # --------------------------------------------------------
+
+    result_data = (
+        result.model_dump()
+    )
+
+    result_data.update({
         "resultId":
             result_id,
 
         "userId":
-            uid,
+            user_id,
 
-        "workoutId":
-            result.workoutId,
+        "completedSets":
+            completed_sets,
 
-        "condition":
-            result.condition,
+        "totalSets":
+            total_sets,
 
-        "startedAt":
-            result.startedAt,
-
-        "completedAt":
-            result.completedAt,
-
-        "completionTimeSeconds":
-            result.completionTimeSeconds,
-
-        "exerciseResults": [
-            exercise.model_dump()
-
-            for exercise
-            in result.exerciseResults
-        ],
+        "fullyCompleted":
+            fully_completed,
 
         "createdAt":
             firestore.SERVER_TIMESTAMP,
     })
 
 
-    updates = {
+    # --------------------------------------------------------
+    # FIRESTORE BATCH
+    # --------------------------------------------------------
+
+    batch = db.batch()
+
+
+    # ========================================================
+    # GAMIFIED WORKOUT
+    # ========================================================
+
+    gamification_response = None
+
+    if result.condition == "gamified":
+
+        stats_ref = (
+            db.collection(
+                "gamificationStats"
+            )
+            .document(user_id)
+        )
+
+        stats_document = (
+            stats_ref.get()
+        )
+
+        current_stats = (
+            stats_document.to_dict()
+            if stats_document.exists
+            else None
+        )
+
+
+        gamification_data = (
+            process_gamified_workout(
+                user_id=user_id,
+                current_stats=current_stats,
+                exercise_results=
+                    result.exerciseResults,
+            )
+        )
+
+
+        updated_stats = (
+            gamification_data[
+                "updatedStats"
+            ]
+        )
+
+        gamification_response = (
+            gamification_data[
+                "gamification"
+            ]
+        )
+
+
+        # Save the gamification result
+        # with this specific workout.
+
+        result_data[
+            "gamification"
+        ] = gamification_response
+
+
+        updated_stats[
+            "updatedAt"
+        ] = firestore.SERVER_TIMESTAMP
+
+
+        batch.set(
+            stats_ref,
+            updated_stats,
+            merge=True,
+        )
+
+
+    # ========================================================
+    # SAVE WORKOUT RESULT
+    # ========================================================
+
+    batch.set(
+        result_ref,
+        result_data,
+    )
+
+
+    # ========================================================
+    # UPDATE USER COUNTERS
+    # ========================================================
+
+    user_updates = {
         "workoutsCompleted":
-            firestore.Increment(1)
+            firestore.Increment(1),
     }
 
 
     if (
-        result.condition ==
-        "non-gamified"
+        result.condition
+        == "gamified"
     ):
-        updates[
-            "nonGamifiedCompleted"
-        ] = firestore.Increment(1)
-
-    else:
-        updates[
+        user_updates[
             "gamifiedCompleted"
         ] = firestore.Increment(1)
 
+    else:
+        user_updates[
+            "nonGamifiedCompleted"
+        ] = firestore.Increment(1)
 
-    user_ref.update(updates)
+
+    batch.update(
+        user_ref,
+        user_updates,
+    )
+
+
+    # ========================================================
+    # COMMIT EVERYTHING
+    # ========================================================
+
+    batch.commit()
 
 
     return {
         "message":
-            "Workout result saved",
+            "Workout result saved.",
 
         "resultId":
             result_id,
+
+        "completedSets":
+            completed_sets,
+
+        "totalSets":
+            total_sets,
+
+        "fullyCompleted":
+            fully_completed,
+
+        "gamification":
+            gamification_response,
     }
