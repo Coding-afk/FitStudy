@@ -5,6 +5,7 @@ from app.api.routes import workouts
 
 from app.api.routes import (
     workout_results,
+    survey_response,
 )
 
 
@@ -13,6 +14,7 @@ app = FastAPI(
 )
 app.include_router(workouts.router)
 app.include_router(workout_results.router)
+app.include_router(survey_response.router)
 
 @app.get("/health")
 def health():
