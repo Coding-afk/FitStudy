@@ -14,12 +14,11 @@ def create_survey_response(
     survey: SurveyResponseCreate,
     user = Depends(get_current_user),
 ):
-    uid = user['uid']
-    response_ref = (db.collection("survey_response").document())
+    response_ref = (db.collection("survey_responses").document())
     response_id = response_ref.id
     response_ref.set({
         "responseId": response_id,
-        "assignmentId": survey.assignmentId,
+        #"assignmentId": survey.assignmentId,
         #"condition": survey.condition, Inputting the condition from group one.
         "motivationRating": survey.motivation,
         "engagementRating": survey.engagement,
