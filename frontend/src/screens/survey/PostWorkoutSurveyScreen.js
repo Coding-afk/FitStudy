@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { saveSurveyResponse } from '../../services/survey';
 import { View, Text, StyleSheet, Button, ScrollView, Alert, Platform, StatusBar } from 'react-native';
 import RatingSelector from '../../components/survey/RatingSelector';
 import { COLORS } from '../../constants/theme';
 
 export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
-  const assignmentId = route?.params?.assignmentId || null;
+  //const assignmentId = route?.params?.assignmentId || null;
 
   const [motivation, setMotivation] = useState(null);
   const [engagement, setEngagement] = useState(null);
@@ -12,7 +13,7 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
   const [perceivedConsistency, setPerceivedConsistency] = useState(null);
   const [perceivedUsefulness, setPerceivedUsefulness] = useState(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!motivation || !engagement || !easeOfUse || !perceivedConsistency || !perceivedUsefulness) {
       Alert.alert(
         'Missing Ratings',
@@ -22,7 +23,7 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
     }
 
     const payload = {
-      assignmentId,
+      //assignmentId,
       motivation,
       engagement,
       easeOfUse,
@@ -30,17 +31,24 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
       perceivedUsefulness,
     };
 
-    console.log('Survey Payload Ready for API:', payload);
-
-    Alert.alert('Thank You!', 'Your feedback has been recorded.', [
-      {
-        text: 'Continue',
-        onPress: () => {
-          if (onBack) onBack();
-          else if (navigation?.navigate) navigation.navigate('Home');
+    try {
+      await saveSurveyResponse(payload);
+      Alert.alert('Thank You!', 'Your feedback has been recorded.', [
+        {
+          text: 'Continue',
+          onPress: () => {
+            if (onBack) onBack();
+            else if (navigation?.navigate) navigation.navigate('Home');
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error) {
+      console.error('Survey submission failed:', error);
+      Alert.alert(
+        'Submission Failed',
+        'Unable to submit your survey. Please try again.'
+      );
+    }
   };
 
   return (
