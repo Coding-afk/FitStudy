@@ -8,6 +8,10 @@ from app.api.routes import (
     survey_response,
 )
 
+from app.api.routes.gamification import (
+    router as gamification_router,
+)
+
 
 app = FastAPI(
     title="FitStudy API",
@@ -15,6 +19,9 @@ app = FastAPI(
 app.include_router(workouts.router)
 app.include_router(workout_results.router)
 app.include_router(survey_response.router)
+app.include_router(
+    gamification_router
+)
 
 @app.get("/health")
 def health():
