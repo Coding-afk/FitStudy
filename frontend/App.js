@@ -1,50 +1,25 @@
-import React from 'react';
+import { View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import OnboardingScreen from './screens/OnboardingScreen';
+import WorkoutSelectionScreen from './screens/WorkoutSelectionScreen';
+import ProgressScreen from './screens/ProgressScreen';
 
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
-function App() {
+const Stack = createStackNavigator();
+
+export default function App() {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <Text style={styles.title}>FitStudy</Text>
-
-        <Text style={styles.subtitle}>Welcome to FitStudy</Text>
-
-        <Text style={styles.text}>
-          Hope you enjoy your time here!
-        </Text>
+    <View style={{ flex: 1, backgroundColor: '#e5e7eb', alignItems: 'center' }}>
+      <View style={{ width: '100%', maxWidth: 400, flex: 1, backgroundColor: '#f5f5f5' }}>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName="Onboarding" screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="WorkoutSelection" component={WorkoutSelectionScreen} />
+            <Stack.Screen name="Progress" component={ProgressScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-
-  subtitle: {
-    fontSize: 20,
-    marginBottom: 10,
-  },
-
-  text: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});
-
-export default App;
