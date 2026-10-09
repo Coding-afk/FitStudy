@@ -3,7 +3,9 @@ import { StyleSheet, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import WorkoutSelectionScreen from '../screens/home/WorkoutSelectionScreen';
-import ProgressScreen from '../screens/progress/ProgressScreen';
+
+import LeaderboardScreen from '../screens/leaderboard/LeaderboardScreen';
+
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -12,8 +14,8 @@ function HomeIcon({ focused }) {
   return <Text style={focused ? styles.iconActive : styles.icon}>⌂</Text>;
 }
 
-function ProgressIcon({ focused }) {
-  return <Text style={focused ? styles.iconActive : styles.icon}>📊</Text>;
+function LeaderboardIcon({ focused }) {
+  return <Text style={focused ? styles.iconActive : styles.icon}>🏆</Text>;
 }
 
 function AccountIcon({ focused }) {
@@ -35,9 +37,13 @@ function MainTabs({ route }) {
 
         tabBarStyle: {
           backgroundColor: '#ffffff',
+
           borderTopColor: '#dddddd',
+
           height: 65,
+
           paddingTop: 5,
+
           paddingBottom: 7,
         },
 
@@ -59,13 +65,10 @@ function MainTabs({ route }) {
       />
 
       <Tab.Screen
-        name="Progress"
-        component={ProgressScreen}
-        initialParams={{
-          participantId,
-        }}
+        name="Leaderboard"
+        component={LeaderboardScreen}
         options={{
-          tabBarIcon: ProgressIcon,
+          tabBarIcon: LeaderboardIcon,
         }}
       />
 

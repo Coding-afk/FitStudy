@@ -5,3 +5,13 @@ export const getMyGamificationStats = async () => {
 
   return response.data;
 };
+
+export const getLeaderboard = async (limit = 25) => {
+  const response = await api.get('/gamification/leaderboard', {
+    params: {
+      limit,
+    },
+  });
+
+  return response.data;
+};
