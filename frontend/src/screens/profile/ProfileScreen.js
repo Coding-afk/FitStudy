@@ -38,9 +38,9 @@ export default function ProfileScreen({ user, navigation, route }) {
     1
   );
 
-  const handleGamificationInfo = () => {
+const handleGamificationInfo = () => {
     if (navigation?.navigate) {
-      navigation.navigate('GamificationInformation');
+      navigation.navigate('GamificationStatsAwards');
     } else {
       Alert.alert(
         'Gamification Info',
