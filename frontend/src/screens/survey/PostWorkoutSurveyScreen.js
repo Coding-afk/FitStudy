@@ -30,6 +30,8 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
 
   const [perceivedUsefulness, setPerceivedUsefulness] = useState(null);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleReturnHome = () => {
     if (onBack) {
       onBack();
@@ -68,6 +70,9 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
       return;
     }
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const payload = {
       motivation,
       engagement,
@@ -92,6 +97,8 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
         'Submission Failed',
         'Unable to submit your survey. Please try again.',
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -135,8 +142,9 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
 
       <View style={styles.submitSection}>
         <Button
-          title="Submit Survey"
+          title={isSubmitting ? 'Submitting...' : 'Submit Survey'}
           onPress={handleSubmit}
+          disabled={isSubmitting}
           color={COLORS.primaryLight}
         />
       </View>
