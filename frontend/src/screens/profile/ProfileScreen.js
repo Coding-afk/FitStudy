@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,39 @@ import {
   Platform,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-
+import {getProfile} from '../../services/profile';
 import { COLORS } from '../../constants/theme';
 
 export default function ProfileScreen({ user, navigation, route }) {
   const participantId = route?.params?.participantId ?? null;
 
+  const [profile, setProfile] = useState(user || {});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const data = await getProfile();
+        console.log('Profile data received:', data)
+        setProfile(data);
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        Alert.alert('Error', 'Unable to load your profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProfile();
+  }, []);
+
   const userInfo = {
-    name: user?.name || 'Student',
-    studyId: user?.studyId || participantId || 'FS-2026-8942',
-    group: user?.group || 'Gamified Group A',
-    completedGamified: user?.completedGamified ?? 6,
-    completedNonGamified: user?.completedNonGamified ?? 4,
+    name: profile.name || 'Not assigned',
+    studyId: profile.studyId || participantId || 'Not assigned',
+    group: profile.group || 'Not assigned',
+    completedGamified: profile.completedGamified ?? 0,
+    completedNonGamified: profile.completedNonGamified ?? 0,
     totalTarget: 10,
   };
 
@@ -37,6 +57,17 @@ export default function ProfileScreen({ user, navigation, route }) {
     Math.max(userInfo.completedNonGamified / userInfo.totalTarget, 0),
     1
   );
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator
+          size="large"
+          color={COLORS.primary}
+        />
+      </View>
+    );
+  }
 
 const handleGamificationInfo = () => {
     if (navigation?.navigate) {

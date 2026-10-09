@@ -6,6 +6,7 @@ from app.api.routes import workouts
 from app.api.routes import (
     workout_results,
     survey_response,
+    profile,
 )
 
 from app.api.routes.gamification import (
@@ -22,6 +23,7 @@ app.include_router(survey_response.router)
 app.include_router(
     gamification_router
 )
+app.include_router(profile.router)
 
 @app.get("/health")
 def health():
