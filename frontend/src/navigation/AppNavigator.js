@@ -10,6 +10,8 @@ import WorkoutSummaryScreen from '../screens/workouts/WorkoutSummaryScreen';
 
 import GamifiedWorkoutSummaryScreen from '../screens/workouts/GamifiedWorkoutSummaryScreen';
 
+import GamificationStatsAwardsScreen from '../screens/gamificationstats/GamificationStatsAwardsScreen';
+
 import PostWorkoutSurveyScreen from '../screens/survey/PostWorkoutSurveyScreen';
 
 import MainTabs from './MainTabs';
@@ -191,6 +193,17 @@ function AppNavigator() {
           PostWorkoutSurveyScreen
         }
       />
+
+        {/* GAMIFICATION STATS & AWARDS ROUTE */}
+      <Stack.Screen
+        name="GamificationStatsAwards"
+        component={
+          GamificationStatsAwardsScreen
+        }
+      />
+
+
+
     </Stack.Navigator>
   );
 }
