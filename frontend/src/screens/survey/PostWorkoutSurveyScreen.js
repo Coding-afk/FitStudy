@@ -1,29 +1,74 @@
 import React, { useState } from 'react';
+
+import {
+  View,
+  Text,
+  StyleSheet,
+  Button,
+  ScrollView,
+  Alert,
+  Platform,
+  StatusBar,
+} from 'react-native';
+
 import { saveSurveyResponse } from '../../services/survey';
-import { View, Text, StyleSheet, Button, ScrollView, Alert, Platform, StatusBar } from 'react-native';
+
 import RatingSelector from '../../components/survey/RatingSelector';
+
 import { COLORS } from '../../constants/theme';
 
 export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
-  //const assignmentId = route?.params?.assignmentId || null;
+  const participantId = route?.params?.participantId ?? null;
 
   const [motivation, setMotivation] = useState(null);
+
   const [engagement, setEngagement] = useState(null);
+
   const [easeOfUse, setEaseOfUse] = useState(null);
+
   const [perceivedConsistency, setPerceivedConsistency] = useState(null);
+
   const [perceivedUsefulness, setPerceivedUsefulness] = useState(null);
 
+  const handleReturnHome = () => {
+    if (onBack) {
+      onBack();
+
+      return;
+    }
+
+    navigation.reset({
+      index: 0,
+
+      routes: [
+        {
+          name: 'MainTabs',
+
+          params: {
+            participantId,
+          },
+        },
+      ],
+    });
+  };
+
   const handleSubmit = async () => {
-    if (!motivation || !engagement || !easeOfUse || !perceivedConsistency || !perceivedUsefulness) {
+    if (
+      !motivation ||
+      !engagement ||
+      !easeOfUse ||
+      !perceivedConsistency ||
+      !perceivedUsefulness
+    ) {
       Alert.alert(
         'Missing Ratings',
-        'Please provide a rating (1-5) for all questions before submitting.'
+        'Please provide a rating (1-5) for all questions before submitting.',
       );
+
       return;
     }
 
     const payload = {
-      //assignmentId,
       motivation,
       engagement,
       easeOfUse,
@@ -33,20 +78,19 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
 
     try {
       await saveSurveyResponse(payload);
+
       Alert.alert('Thank You!', 'Your feedback has been recorded.', [
         {
           text: 'Continue',
-          onPress: () => {
-            if (onBack) onBack();
-            else if (navigation?.navigate) navigation.navigate('Home');
-          },
+          onPress: handleReturnHome,
         },
       ]);
     } catch (error) {
       console.error('Survey submission failed:', error);
+
       Alert.alert(
         'Submission Failed',
-        'Unable to submit your survey. Please try again.'
+        'Unable to submit your survey. Please try again.',
       );
     }
   };
@@ -54,6 +98,7 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Post-Workout Survey</Text>
+
       <Text style={styles.subtitle}>
         Please rate your workout experience to help with our study research.
       </Text>
@@ -89,7 +134,11 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
       />
 
       <View style={styles.submitSection}>
-        <Button title="Submit Survey" onPress={handleSubmit} color={COLORS.primaryLight} />
+        <Button
+          title="Submit Survey"
+          onPress={handleSubmit}
+          color={COLORS.primaryLight}
+        />
       </View>
     </ScrollView>
   );
@@ -100,22 +149,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+
   content: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50,
+
+    paddingTop:
+      Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50,
   },
+
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.text,
     marginBottom: 6,
   },
+
   subtitle: {
     fontSize: 14,
     color: COLORS.textSecondary,
     marginBottom: 24,
   },
+
   submitSection: {
     marginTop: 32,
     marginBottom: 40,
