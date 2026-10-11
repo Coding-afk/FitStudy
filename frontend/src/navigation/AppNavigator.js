@@ -1,4 +1,4 @@
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 
@@ -10,6 +10,8 @@ import WorkoutSummaryScreen from '../screens/workouts/WorkoutSummaryScreen';
 
 import GamifiedWorkoutSummaryScreen from '../screens/workouts/GamifiedWorkoutSummaryScreen';
 
+import GamificationStatsAwardsScreen from '../screens/gamificationstats/GamificationStatsAwardsScreen';
+
 import PostWorkoutSurveyScreen from '../screens/survey/PostWorkoutSurveyScreen';
 import WelcomeScreen from '../screens/welcome page/WelcomeScreen';
 import RegisterScreen from '../screens/auth/registerPage';
@@ -17,23 +19,31 @@ import RegisterScreen from '../screens/auth/registerPage';
 
 import MainTabs from './MainTabs';
 
-import { COLORS } from '../constants/theme';
+import {COLORS} from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
 
-function NonGamifiedWorkoutRoute({ navigation, route }) {
-  const workoutId = route.params?.workoutId ?? 'W001';
+function NonGamifiedWorkoutRoute({
+  navigation,
+  route,
+}) {
+  const workoutId =
+    route.params?.workoutId ?? 'W001';
 
-  const participantId = route.params?.participantId ?? null;
+  const participantId =
+    route.params?.participantId ?? null;
 
   return (
     <NonGamifiedWorkoutScreen
       workoutId={workoutId}
       onCompleteWorkout={summary => {
-        navigation.replace('NonGamifiedSummary', {
-          summary,
-          participantId,
-        });
+        navigation.replace(
+          'NonGamifiedSummary',
+          {
+            summary,
+            participantId,
+          },
+        );
       }}
       onDiscardWorkout={() => {
         navigation.goBack();
@@ -42,19 +52,27 @@ function NonGamifiedWorkoutRoute({ navigation, route }) {
   );
 }
 
-function GamifiedWorkoutRoute({ navigation, route }) {
-  const workoutId = route.params?.workoutId ?? 'W001';
+function GamifiedWorkoutRoute({
+  navigation,
+  route,
+}) {
+  const workoutId =
+    route.params?.workoutId ?? 'W001';
 
-  const participantId = route.params?.participantId ?? null;
+  const participantId =
+    route.params?.participantId ?? null;
 
   return (
     <GamifiedWorkoutScreen
       workoutId={workoutId}
       onCompleteWorkout={summary => {
-        navigation.replace('GamifiedSummary', {
-          summary,
-          participantId,
-        });
+        navigation.replace(
+          'GamifiedSummary',
+          {
+            summary,
+            participantId,
+          },
+        );
       }}
       onDiscardWorkout={() => {
         navigation.goBack();
@@ -63,39 +81,59 @@ function GamifiedWorkoutRoute({ navigation, route }) {
   );
 }
 
-function NonGamifiedSummaryRoute({ navigation, route }) {
-  const summary = route.params?.summary ?? null;
+function NonGamifiedSummaryRoute({
+  navigation,
+  route,
+}) {
+  const summary =
+    route.params?.summary ?? null;
 
-  const participantId = route.params?.participantId ?? null;
+  const participantId =
+    route.params?.participantId ?? null;
 
   return (
     <WorkoutSummaryScreen
       summary={summary}
       onDone={() => {
-        navigation.replace('PostWorkoutSurvey', {
-          participantId,
-          workoutId: summary?.workoutId ?? null,
-          condition: 'non-gamified',
-        });
+        navigation.replace(
+          'PostWorkoutSurvey',
+          {
+            participantId,
+            workoutId:
+              summary?.workoutId ?? null,
+            condition:
+              'non-gamified',
+          },
+        );
       }}
     />
   );
 }
 
-function GamifiedSummaryRoute({ navigation, route }) {
-  const summary = route.params?.summary ?? null;
+function GamifiedSummaryRoute({
+  navigation,
+  route,
+}) {
+  const summary =
+    route.params?.summary ?? null;
 
-  const participantId = route.params?.participantId ?? null;
+  const participantId =
+    route.params?.participantId ?? null;
 
   return (
     <GamifiedWorkoutSummaryScreen
       summary={summary}
       onDone={() => {
-        navigation.replace('PostWorkoutSurvey', {
-          participantId,
-          workoutId: summary?.workoutId ?? null,
-          condition: 'gamified',
-        });
+        navigation.replace(
+          'PostWorkoutSurvey',
+          {
+            participantId,
+            workoutId:
+              summary?.workoutId ?? null,
+            condition:
+              'gamified',
+          },
+        );
       }}
     />
   );
@@ -109,7 +147,8 @@ function AppNavigator() {
         headerShown: false,
 
         contentStyle: {
-          backgroundColor: COLORS.background,
+          backgroundColor:
+            COLORS.background,
         },
       }}
     >
@@ -120,22 +159,49 @@ function AppNavigator() {
 
       <Stack.Screen
         name="NonGamifiedWorkout"
-        component={NonGamifiedWorkoutRoute}
+        component={
+          NonGamifiedWorkoutRoute
+        }
       />
 
-      <Stack.Screen name="GamifiedWorkout" component={GamifiedWorkoutRoute} />
+      <Stack.Screen
+        name="GamifiedWorkout"
+        component={
+          GamifiedWorkoutRoute
+        }
+      />
 
       <Stack.Screen
         name="NonGamifiedSummary"
-        component={NonGamifiedSummaryRoute}
+        component={
+          NonGamifiedSummaryRoute
+        }
       />
 
-      <Stack.Screen name="GamifiedSummary" component={GamifiedSummaryRoute} />
+      <Stack.Screen
+        name="GamifiedSummary"
+        component={
+          GamifiedSummaryRoute
+        }
+      />
 
       <Stack.Screen
         name="PostWorkoutSurvey"
-        component={PostWorkoutSurveyScreen}
+        component={
+          PostWorkoutSurveyScreen
+        }
       />
+
+        {/* GAMIFICATION STATS & AWARDS ROUTE */}
+      <Stack.Screen
+        name="GamificationStatsAwards"
+        component={
+          GamificationStatsAwardsScreen
+        }
+      />
+
+
+
     </Stack.Navigator>
   );
 }
