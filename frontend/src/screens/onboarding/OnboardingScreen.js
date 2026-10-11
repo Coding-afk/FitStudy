@@ -1,6 +1,13 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { useState } from 'react';
-import { COLORS } from '../constants/theme';
+
+import { COLORS } from '../../constants/theme';
 
 export default function OnboardingScreen({ navigation, route }) {
   const { participantId } = route.params || {};
@@ -8,11 +15,11 @@ export default function OnboardingScreen({ navigation, route }) {
   const [injury, setInjury] = useState(null);
   const [pregnant, setPregnant] = useState(null);
 
-  const allAnswered = heartCondition !== null && injury !== null && pregnant !== null;
+  const allAnswered =
+    heartCondition !== null && injury !== null && pregnant !== null;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <View style={styles.header}>
         <Text style={styles.title}>Health Screening</Text>
         <Text style={styles.subtitle}>
@@ -24,17 +31,41 @@ export default function OnboardingScreen({ navigation, route }) {
         <Text style={styles.cardLabel}>Please answer all questions</Text>
 
         <View style={styles.questionRow}>
-          <Text style={styles.questionText}>Do you have any heart conditions?</Text>
+          <Text style={styles.questionText}>
+            Do you have any heart conditions?
+          </Text>
           <View style={styles.toggleRow}>
             <TouchableOpacity
-              style={[styles.toggleBtn, heartCondition === 'yes' && styles.toggleActive]}
-              onPress={() => setHeartCondition('yes')}>
-              <Text style={[styles.toggleText, heartCondition === 'yes' && styles.toggleTextActive]}>Yes</Text>
+              style={[
+                styles.toggleBtn,
+                heartCondition === 'yes' && styles.toggleActive,
+              ]}
+              onPress={() => setHeartCondition('yes')}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  heartCondition === 'yes' && styles.toggleTextActive,
+                ]}
+              >
+                Yes
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.toggleBtn, heartCondition === 'no' && styles.toggleActive]}
-              onPress={() => setHeartCondition('no')}>
-              <Text style={[styles.toggleText, heartCondition === 'no' && styles.toggleTextActive]}>No</Text>
+              style={[
+                styles.toggleBtn,
+                heartCondition === 'no' && styles.toggleActive,
+              ]}
+              onPress={() => setHeartCondition('no')}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  heartCondition === 'no' && styles.toggleTextActive,
+                ]}
+              >
+                No
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -45,14 +76,33 @@ export default function OnboardingScreen({ navigation, route }) {
           <Text style={styles.questionText}>Any joint or muscle injuries?</Text>
           <View style={styles.toggleRow}>
             <TouchableOpacity
-              style={[styles.toggleBtn, injury === 'yes' && styles.toggleActive]}
-              onPress={() => setInjury('yes')}>
-              <Text style={[styles.toggleText, injury === 'yes' && styles.toggleTextActive]}>Yes</Text>
+              style={[
+                styles.toggleBtn,
+                injury === 'yes' && styles.toggleActive,
+              ]}
+              onPress={() => setInjury('yes')}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  injury === 'yes' && styles.toggleTextActive,
+                ]}
+              >
+                Yes
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleBtn, injury === 'no' && styles.toggleActive]}
-              onPress={() => setInjury('no')}>
-              <Text style={[styles.toggleText, injury === 'no' && styles.toggleTextActive]}>No</Text>
+              onPress={() => setInjury('no')}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  injury === 'no' && styles.toggleTextActive,
+                ]}
+              >
+                No
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -63,14 +113,36 @@ export default function OnboardingScreen({ navigation, route }) {
           <Text style={styles.questionText}>Pregnant or postpartum?</Text>
           <View style={styles.toggleRow}>
             <TouchableOpacity
-              style={[styles.toggleBtn, pregnant === 'yes' && styles.toggleActive]}
-              onPress={() => setPregnant('yes')}>
-              <Text style={[styles.toggleText, pregnant === 'yes' && styles.toggleTextActive]}>Yes</Text>
+              style={[
+                styles.toggleBtn,
+                pregnant === 'yes' && styles.toggleActive,
+              ]}
+              onPress={() => setPregnant('yes')}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  pregnant === 'yes' && styles.toggleTextActive,
+                ]}
+              >
+                Yes
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.toggleBtn, pregnant === 'no' && styles.toggleActive]}
-              onPress={() => setPregnant('no')}>
-              <Text style={[styles.toggleText, pregnant === 'no' && styles.toggleTextActive]}>No</Text>
+              style={[
+                styles.toggleBtn,
+                pregnant === 'no' && styles.toggleActive,
+              ]}
+              onPress={() => setPregnant('no')}
+            >
+              <Text
+                style={[
+                  styles.toggleText,
+                  pregnant === 'no' && styles.toggleTextActive,
+                ]}
+              >
+                No
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -78,7 +150,8 @@ export default function OnboardingScreen({ navigation, route }) {
 
       <View style={styles.warningCard}>
         <Text style={styles.warningText}>
-          ⚠️ You may stop or withdraw at any time during any workout without penalty.
+          ⚠️ You may stop or withdraw at any time during any workout without
+          penalty.
         </Text>
       </View>
 
@@ -86,13 +159,15 @@ export default function OnboardingScreen({ navigation, route }) {
         style={[styles.btn, !allAnswered && styles.btnDisabled]}
         disabled={!allAnswered}
         onPress={() => {
-          navigation.navigate('WorkoutSelection', { participantId });
-        }}>
+          navigation.navigate('Register', { participantId });
+        }}
+      >
         <Text style={styles.btnText}>Agree and continue</Text>
       </TouchableOpacity>
 
-      <Text style={styles.footerText}>Your data is anonymous and never shared.</Text>
-
+      <Text style={styles.footerText}>
+        Your data is anonymous and never shared.
+      </Text>
     </ScrollView>
   );
 }

@@ -37,7 +37,7 @@ export default function RegisterScreen({ navigation }) {
       // TODO: connect to Firebase Authentication
       // For now navigate to onboarding with username as participantId
       const participantId = '#FIT-' + Math.floor(10000 + Math.random() * 90000);
-      navigation.navigate('Onboarding', { participantId, username });
+      navigation.navigate('MainTabs', { participantId, username });
     } catch (error) {
       Alert.alert('Registration failed', error.message);
     } finally {

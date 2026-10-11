@@ -13,7 +13,9 @@ import GamifiedWorkoutSummaryScreen from '../screens/workouts/GamifiedWorkoutSum
 import GamificationStatsAwardsScreen from '../screens/gamificationstats/GamificationStatsAwardsScreen';
 
 import PostWorkoutSurveyScreen from '../screens/survey/PostWorkoutSurveyScreen';
+
 import WelcomeScreen from '../screens/welcome page/WelcomeScreen';
+
 import RegisterScreen from '../screens/auth/registerPage';
 
 

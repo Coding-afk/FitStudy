@@ -1,11 +1,41 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
-import { COLORS } from '../constants/theme';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
+import { COLORS } from '../../constants/theme';
 
 const workouts = [
-  { id: 1, name: 'Upper body circuit', duration: 20, level: 'Intermediate', completed: false },
-  { id: 2, name: 'Core and cardio', duration: 25, level: 'Intermediate', completed: true },
-  { id: 3, name: 'Lower body strength', duration: 30, level: 'Intermediate', completed: true },
-  { id: 4, name: 'Full body HIIT', duration: 20, level: 'Intermediate', completed: true },
+  {
+    id: 1,
+    name: 'Upper body circuit',
+    duration: 20,
+    level: 'Intermediate',
+    completed: false,
+  },
+  {
+    id: 2,
+    name: 'Core and cardio',
+    duration: 25,
+    level: 'Intermediate',
+    completed: true,
+  },
+  {
+    id: 3,
+    name: 'Lower body strength',
+    duration: 30,
+    level: 'Intermediate',
+    completed: true,
+  },
+  {
+    id: 4,
+    name: 'Full body HIIT',
+    duration: 20,
+    level: 'Intermediate',
+    completed: true,
+  },
 ];
 
 export default function WorkoutSelectionScreen({ navigation, route }) {
@@ -17,9 +47,7 @@ export default function WorkoutSelectionScreen({ navigation, route }) {
 
   return (
     <View style={styles.wrapper}>
-
       <ScrollView contentContainerStyle={styles.container}>
-
         <Text style={styles.heading}>Your workouts</Text>
 
         {upNext && (
@@ -27,8 +55,16 @@ export default function WorkoutSelectionScreen({ navigation, route }) {
             <Text style={styles.sectionLabel}>Up next</Text>
             <View style={styles.upNextCard}>
               <Text style={styles.upNextName}>{upNext.name}</Text>
-              <Text style={styles.upNextMeta}>{upNext.duration} min · {upNext.level} · Workout {completed + 1} of {total}</Text>
-              <TouchableOpacity style={styles.startBtn} onPress={() => navigation.navigate('StandardWorkout', { participantId })}>
+              <Text style={styles.upNextMeta}>
+                {upNext.duration} min · {upNext.level} · Workout {completed + 1}{' '}
+                of {total}
+              </Text>
+              <TouchableOpacity
+                style={styles.startBtn}
+                onPress={() =>
+                  navigation.navigate('StandardWorkout', { participantId })
+                }
+              >
                 <Text style={styles.startBtnText}>Start workout</Text>
               </TouchableOpacity>
             </View>
@@ -37,44 +73,44 @@ export default function WorkoutSelectionScreen({ navigation, route }) {
 
         <Text style={styles.sectionLabel}>Completed</Text>
         <View style={styles.card}>
-          {workouts.filter(w => w.completed).map((workout, index, arr) => (
-            <View key={workout.id} style={[styles.workoutRow, index === arr.length - 1 && { borderBottomWidth: 0 }]}>
-              <View>
-                <Text style={styles.workoutName}>{workout.name}</Text>
-                <Text style={styles.workoutMeta}>{workout.duration} min · {workout.level}</Text>
+          {workouts
+            .filter(w => w.completed)
+            .map((workout, index, arr) => (
+              <View
+                key={workout.id}
+                style={[
+                  styles.workoutRow,
+                  index === arr.length - 1 && { borderBottomWidth: 0 },
+                ]}
+              >
+                <View>
+                  <Text style={styles.workoutName}>{workout.name}</Text>
+                  <Text style={styles.workoutMeta}>
+                    {workout.duration} min · {workout.level}
+                  </Text>
+                </View>
+                <Text style={styles.checkmark}>✓</Text>
               </View>
-              <Text style={styles.checkmark}>✓</Text>
-            </View>
-          ))}
+            ))}
         </View>
 
         <View style={styles.progressSection}>
           <View style={styles.progressRow}>
             <Text style={styles.progressLabel}>Overall progress</Text>
-            <Text style={styles.progressCount}>{completed} / {total} done</Text>
+            <Text style={styles.progressCount}>
+              {completed} / {total} done
+            </Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+            <View
+              style={[styles.progressFill, { width: `${progress * 100}%` }]}
+            />
           </View>
-          <Text style={styles.progressNote}>Complete all 10 workouts to unlock your reward.</Text>
+          <Text style={styles.progressNote}>
+            Complete all 10 workouts to unlock your reward.
+          </Text>
         </View>
-
       </ScrollView>
-
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('WorkoutSelection', { participantId })}>
-          <Text style={styles.navIconActive}>⌂</Text>
-          <Text style={styles.navLabelActive}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Progress', { participantId })}>
-          <Text style={styles.navIcon}>📊</Text>
-          <Text style={styles.navLabel}>Progress</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Account', { participantId })}>
-          <Text style={styles.navIcon}>👤</Text>
-          <Text style={styles.navLabel}>Account</Text>
-        </TouchableOpacity>
-      </View>
 
     </View>
   );
