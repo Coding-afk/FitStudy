@@ -10,31 +10,12 @@ import { COLORS } from '../../constants/theme';
 const workouts = [
   {
     id: 1,
+    workoutId: 'W001',
     name: 'Upper body circuit',
     duration: 20,
     level: 'Intermediate',
+    condition: 'gamified',
     completed: false,
-  },
-  {
-    id: 2,
-    name: 'Core and cardio',
-    duration: 25,
-    level: 'Intermediate',
-    completed: true,
-  },
-  {
-    id: 3,
-    name: 'Lower body strength',
-    duration: 30,
-    level: 'Intermediate',
-    completed: true,
-  },
-  {
-    id: 4,
-    name: 'Full body HIIT',
-    duration: 20,
-    level: 'Intermediate',
-    completed: true,
   },
 ];
 
@@ -44,6 +25,23 @@ export default function WorkoutSelectionScreen({ navigation, route }) {
   const total = 10;
   const progress = completed / total;
   const upNext = workouts.find(w => !w.completed);
+
+  const handleStartWorkout = () => {
+    if (!upNext) {
+      return;
+    }
+
+    const screenName =
+      upNext.condition === 'gamified'
+        ? 'GamifiedWorkout'
+        : 'NonGamifiedWorkout';
+
+    navigation.getParent()?.navigate(screenName, {
+      workoutId: upNext.workoutId,
+
+      participantId,
+    });
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -61,9 +59,7 @@ export default function WorkoutSelectionScreen({ navigation, route }) {
               </Text>
               <TouchableOpacity
                 style={styles.startBtn}
-                onPress={() =>
-                  navigation.navigate('StandardWorkout', { participantId })
-                }
+                onPress={handleStartWorkout}
               >
                 <Text style={styles.startBtnText}>Start workout</Text>
               </TouchableOpacity>
@@ -111,7 +107,6 @@ export default function WorkoutSelectionScreen({ navigation, route }) {
           </Text>
         </View>
       </ScrollView>
-
     </View>
   );
 }

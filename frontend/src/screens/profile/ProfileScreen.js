@@ -70,15 +70,8 @@ export default function ProfileScreen({ user, navigation, route }) {
   }
 
 const handleGamificationInfo = () => {
-    if (navigation?.navigate) {
-      navigation.navigate('GamificationStatsAwards');
-    } else {
-      Alert.alert(
-        'Gamification Info',
-        'GamificationInformation screen navigation target ready for implementation.'
-      );
-    }
-  };
+  navigation.getParent()?.navigate('GamificationStatsAwards');
+};
 
   const handlePasswordReset = () => {
     Alert.alert(

@@ -138,9 +138,8 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
 
       <BadgeUnlockModal
         visible={showBadgePopup}
-        badge={badges[badgeIndex]}
-        hasMoreBadges={badgeIndex < badges.length - 1}
-        onContinue={handleBadgeContinue}
+        badgeId={badges[badgeIndex]}
+        onClose={handleBadgeContinue}
       />
 
       <ScrollView

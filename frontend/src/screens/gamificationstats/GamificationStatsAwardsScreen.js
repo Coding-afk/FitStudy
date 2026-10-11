@@ -20,11 +20,19 @@ export default function GamificationStatsAwardsScreen({ navigation, onBack }) {
   const handleGoBack = () => {
     if (onBack) {
       onBack();
-    } else if (navigation?.goBack) {
-      navigation.goBack();
-    } else if (navigation?.navigate) {
-      navigation.navigate('Home');
+
+      return;
     }
+
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+
+      return;
+    }
+
+    navigation.navigate('MainTabs', {
+      screen: 'Home',
+    });
   };
 
   return (
