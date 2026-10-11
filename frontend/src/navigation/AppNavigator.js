@@ -13,6 +13,9 @@ import GamifiedWorkoutSummaryScreen from '../screens/workouts/GamifiedWorkoutSum
 import GamificationStatsAwardsScreen from '../screens/gamificationstats/GamificationStatsAwardsScreen';
 
 import PostWorkoutSurveyScreen from '../screens/survey/PostWorkoutSurveyScreen';
+import WelcomeScreen from '../screens/welcome page/WelcomeScreen';
+import RegisterScreen from '../screens/auth/registerPage';
+
 
 import MainTabs from './MainTabs';
 
@@ -139,7 +142,7 @@ function GamifiedSummaryRoute({
 function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Onboarding"
+      initialRouteName="Welcome"
       screenOptions={{
         headerShown: false,
 
@@ -149,15 +152,10 @@ function AppNavigator() {
         },
       }}
     >
-      <Stack.Screen
-        name="Onboarding"
-        component={OnboardingScreen}
-      />
-
-      <Stack.Screen
-        name="MainTabs"
-        component={MainTabs}
-      />
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="MainTabs" component={MainTabs} />
 
       <Stack.Screen
         name="NonGamifiedWorkout"
