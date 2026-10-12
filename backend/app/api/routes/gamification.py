@@ -134,14 +134,10 @@ def create_player_alias(
     user_id: str,
 ) -> str:
     """
-    Creates a stable anonymous player
-    name from the Firebase UID.
+    Fallback display name used only when a user profile
+    does not contain a username.
 
-    The UID itself is NEVER returned
-    to the frontend.
-
-    Example:
-        Player 428391
+    The Firebase UID itself is never returned.
     """
 
     digest = hashlib.sha256(
@@ -158,6 +154,43 @@ def create_player_alias(
 
     return (
         f"Player {number:06d}"
+    )
+
+
+def get_leaderboard_name(
+    user_id: str,
+) -> str:
+    """
+    Returns the participant's chosen FitStudy username.
+
+    Falls back to the stable Player xxxxxx alias for old
+    accounts that do not yet have a username field.
+    """
+
+    user_document = (
+        db.collection("users")
+        .document(user_id)
+        .get()
+    )
+
+    if user_document.exists:
+        user_data = (
+            user_document.to_dict()
+            or {}
+        )
+
+        username = user_data.get(
+            "username"
+        )
+
+        if (
+            isinstance(username, str)
+            and username.strip()
+        ):
+            return username.strip()
+
+    return create_player_alias(
+        user_id
     )
 
 
@@ -282,7 +315,7 @@ def get_leaderboard(
                 user_id,
 
             "alias":
-                create_player_alias(
+                get_leaderboard_name(
                     user_id
                 ),
 
@@ -327,7 +360,7 @@ def get_leaderboard(
                 current_user_id,
 
             "alias":
-                create_player_alias(
+                get_leaderboard_name(
                     current_user_id
                 ),
 

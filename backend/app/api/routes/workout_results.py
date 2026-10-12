@@ -7,16 +7,9 @@ from fastapi import (
 
 from firebase_admin import firestore
 
-from app.core.auth import (
-    get_current_user,
-)
-
+from app.core.auth import get_current_user
 from app.core.firebase import db
-
-from app.models.workout_result import (
-    WorkoutResultCreate,
-)
-
+from app.models.workout_result import WorkoutResultCreate
 from app.services.gamification import (
     get_set_counts,
     process_gamified_workout,
@@ -29,272 +22,290 @@ router = APIRouter(
 )
 
 
+def _get_user_id(current_user: dict) -> str:
+    user_id = current_user.get("uid")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not authenticated.",
+        )
+
+    return user_id
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
 )
 def create_workout_result(
     result: WorkoutResultCreate,
-
-    current_user: dict = Depends(
-        get_current_user
-    ),
+    current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user["uid"]
+    user_id = _get_user_id(current_user)
 
-
-    # TODO:
-    # Replace this temporary result ID
-    # with assignmentId once Group 1's
-    # assignment flow is integrated.
-    #
-    # Each workout result should
-    # eventually belong to one specific
-    # workoutAssignment.
-
-    result_id = (
-        f"{user_id}_"
-        f"{result.workoutId}_"
-        f"{result.condition}"
+    assignment_ref = (
+        db.collection("workoutAssignments")
+        .document(result.assignmentId)
     )
-
 
     result_ref = (
-        db.collection(
-            "workoutResults"
-        )
-        .document(result_id)
+        db.collection("workoutResults")
+        .document(result.assignmentId)
     )
-
-
-    # --------------------------------------------------------
-    # PREVENT DUPLICATE RESULT
-    # --------------------------------------------------------
-
-    existing_result = (
-        result_ref.get()
-    )
-
-    if existing_result.exists:
-        raise HTTPException(
-            status_code=
-                status.HTTP_409_CONFLICT,
-
-            detail=
-                "A result already exists "
-                "for this workout and "
-                "condition.",
-        )
-
-
-    # --------------------------------------------------------
-    # CHECK USER EXISTS
-    # --------------------------------------------------------
 
     user_ref = (
         db.collection("users")
         .document(user_id)
     )
 
-    user_document = (
-        user_ref.get()
+    stats_ref = (
+        db.collection("gamificationStats")
+        .document(user_id)
     )
 
-    if not user_document.exists:
-        raise HTTPException(
-            status_code=
-                status.HTTP_404_NOT_FOUND,
-
-            detail=
-                "User profile not found.",
-        )
-
-
-    # --------------------------------------------------------
-    # CALCULATE GENERAL WORKOUT STATS
-    # --------------------------------------------------------
-
-    completed_sets, total_sets = (
-        get_set_counts(
-            result.exerciseResults
-        )
+    completed_sets, total_sets = get_set_counts(
+        result.exerciseResults
     )
 
     fully_completed = (
         total_sets > 0
-        and completed_sets
-        == total_sets
+        and completed_sets == total_sets
     )
 
+    base_result_data = result.model_dump()
 
-    # --------------------------------------------------------
-    # BASIC RESULT DATA
-    # --------------------------------------------------------
+    transaction = db.transaction()
 
-    result_data = (
-        result.model_dump()
-    )
+    @firestore.transactional
+    def complete_workout(transaction):
+        # ====================================================
+        # READ EVERYTHING FIRST
+        #
+        # Firestore transactions may retry automatically.
+        # Keeping every validation read inside the transaction
+        # prevents two simultaneous submissions from both
+        # awarding XP or incrementing counters.
+        # ====================================================
 
-    result_data.update({
-        "resultId":
-            result_id,
+        assignment_document = assignment_ref.get(
+            transaction=transaction
+        )
 
-        "userId":
-            user_id,
+        existing_result_document = result_ref.get(
+            transaction=transaction
+        )
 
-        "completedSets":
-            completed_sets,
+        user_document = user_ref.get(
+            transaction=transaction
+        )
 
-        "totalSets":
-            total_sets,
+        stats_document = None
 
-        "fullyCompleted":
-            fully_completed,
-
-        "createdAt":
-            firestore.SERVER_TIMESTAMP,
-    })
-
-
-    # --------------------------------------------------------
-    # FIRESTORE BATCH
-    # --------------------------------------------------------
-
-    batch = db.batch()
-
-
-    # ========================================================
-    # GAMIFIED WORKOUT
-    # ========================================================
-
-    gamification_response = None
-
-    if result.condition == "gamified":
-
-        stats_ref = (
-            db.collection(
-                "gamificationStats"
+        if result.condition == "gamified":
+            stats_document = stats_ref.get(
+                transaction=transaction
             )
-            .document(user_id)
+
+        # ====================================================
+        # VALIDATE ASSIGNMENT
+        # ====================================================
+
+        if not assignment_document.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workout assignment not found.",
+            )
+
+        assignment = (
+            assignment_document.to_dict()
+            or {}
         )
 
-        stats_document = (
-            stats_ref.get()
-        )
+        if assignment.get("userId") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "This workout assignment does not belong "
+                    "to the current user."
+                ),
+            )
 
-        current_stats = (
-            stats_document.to_dict()
-            if stats_document.exists
-            else None
-        )
+        # A result document is the strongest duplicate check.
+        # If it exists, this exact assignment has already been
+        # submitted and must never award XP/counters again.
+        if existing_result_document.exists:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "A workout result already exists for this "
+                    "assignment. It cannot be submitted twice."
+                ),
+            )
 
+        if assignment.get("status") == "completed":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This assignment has already been completed."
+                ),
+            )
 
-        gamification_data = (
-            process_gamified_workout(
+        if assignment.get("status") != "in_progress":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This assignment must be started before it "
+                    "can be completed."
+                ),
+            )
+
+        if assignment.get("workoutId") != result.workoutId:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Workout ID does not match the assigned "
+                    "workout."
+                ),
+            )
+
+        if assignment.get("condition") != result.condition:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Workout condition does not match the "
+                    "assignment."
+                ),
+            )
+
+        # ====================================================
+        # VALIDATE USER PROFILE
+        # ====================================================
+
+        if not user_document.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found.",
+            )
+
+        user_data = user_document.to_dict() or {}
+
+        # ====================================================
+        # PREPARE RESULT + GAMIFICATION
+        # ====================================================
+
+        result_data = dict(base_result_data)
+
+        result_data.update({
+            "resultId": result.assignmentId,
+            "userId": user_id,
+            "completedSets": completed_sets,
+            "totalSets": total_sets,
+            "fullyCompleted": fully_completed,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        })
+
+        gamification_response = None
+
+        if result.condition == "gamified":
+            current_stats = None
+
+            if stats_document and stats_document.exists:
+                current_stats = (
+                    stats_document.to_dict()
+                    or {}
+                )
+
+            gamification_data = process_gamified_workout(
                 user_id=user_id,
                 current_stats=current_stats,
-                exercise_results=
-                    result.exerciseResults,
+                exercise_results=result.exerciseResults,
             )
+
+            updated_stats = dict(
+                gamification_data["updatedStats"]
+            )
+
+            gamification_response = (
+                gamification_data["gamification"]
+            )
+
+            result_data["gamification"] = (
+                gamification_response
+            )
+
+            updated_stats["updatedAt"] = (
+                firestore.SERVER_TIMESTAMP
+            )
+
+        # ====================================================
+        # CALCULATE USER COUNTERS FROM THE TRANSACTION SNAPSHOT
+        # ====================================================
+
+        workouts_completed = int(
+            user_data.get("workoutsCompleted", 0)
+        ) + 1
+
+        gamified_completed = int(
+            user_data.get("gamifiedCompleted", 0)
         )
 
-
-        updated_stats = (
-            gamification_data[
-                "updatedStats"
-            ]
+        non_gamified_completed = int(
+            user_data.get("nonGamifiedCompleted", 0)
         )
 
-        gamification_response = (
-            gamification_data[
-                "gamification"
-            ]
+        if result.condition == "gamified":
+            gamified_completed += 1
+        else:
+            non_gamified_completed += 1
+
+        user_updates = {
+            "workoutsCompleted": workouts_completed,
+            "gamifiedCompleted": gamified_completed,
+            "nonGamifiedCompleted": non_gamified_completed,
+            "finalRewardUnlocked": workouts_completed >= 10,
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        }
+
+        # ====================================================
+        # WRITE EVERYTHING IN ONE TRANSACTION
+        # ====================================================
+
+        transaction.set(
+            result_ref,
+            result_data,
         )
 
-
-        # Save the gamification result
-        # with this specific workout.
-
-        result_data[
-            "gamification"
-        ] = gamification_response
-
-
-        updated_stats[
-            "updatedAt"
-        ] = firestore.SERVER_TIMESTAMP
-
-
-        batch.set(
-            stats_ref,
-            updated_stats,
-            merge=True,
+        transaction.update(
+            assignment_ref,
+            {
+                "status": "completed",
+                "completedAt": firestore.SERVER_TIMESTAMP,
+            },
         )
 
+        transaction.update(
+            user_ref,
+            user_updates,
+        )
 
-    # ========================================================
-    # SAVE WORKOUT RESULT
-    # ========================================================
+        if result.condition == "gamified":
+            transaction.set(
+                stats_ref,
+                updated_stats,
+                merge=True,
+            )
 
-    batch.set(
-        result_ref,
-        result_data,
-    )
+        return {
+            "message": (
+                "Workout result saved and assignment completed."
+            ),
+            "resultId": result.assignmentId,
+            "assignmentId": result.assignmentId,
+            "completedSets": completed_sets,
+            "totalSets": total_sets,
+            "fullyCompleted": fully_completed,
+            "gamification": gamification_response,
+        }
 
-
-    # ========================================================
-    # UPDATE USER COUNTERS
-    # ========================================================
-
-    user_updates = {
-        "workoutsCompleted":
-            firestore.Increment(1),
-    }
-
-
-    if (
-        result.condition
-        == "gamified"
-    ):
-        user_updates[
-            "gamifiedCompleted"
-        ] = firestore.Increment(1)
-
-    else:
-        user_updates[
-            "nonGamifiedCompleted"
-        ] = firestore.Increment(1)
-
-
-    batch.update(
-        user_ref,
-        user_updates,
-    )
-
-
-    # ========================================================
-    # COMMIT EVERYTHING
-    # ========================================================
-
-    batch.commit()
-
-
-    return {
-        "message":
-            "Workout result saved.",
-
-        "resultId":
-            result_id,
-
-        "completedSets":
-            completed_sets,
-
-        "totalSets":
-            total_sets,
-
-        "fullyCompleted":
-            fully_completed,
-
-        "gamification":
-            gamification_response,
-    }
+    return complete_workout(transaction)

@@ -23,6 +23,8 @@ class ExerciseResult(BaseModel):
 
 
 class WorkoutResultCreate(BaseModel):
+    assignmentId: str
+
     workoutId: str
 
     condition: Literal[

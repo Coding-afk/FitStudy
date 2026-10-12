@@ -15,6 +15,10 @@ import ConfettiBurst from '../../components/gamification/ConfettiBurst';
 
 import BadgeUnlockModal from '../../components/gamification/BadgeUnlockModal';
 
+import BadgeIcon from '../../components/gamification/BadgeIcon';
+
+import { getBadgeDefinition } from '../../constants/badges';
+
 import { COLORS } from '../../constants/theme';
 
 Sound.setCategory('Playback');
@@ -32,7 +36,26 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
 
   const game = summary?.gamification ?? {};
 
-  const badges = game.newlyUnlockedBadges ?? [];
+  const badges = (game.newlyUnlockedBadges ?? [])
+    .map(badge => {
+      const badgeId =
+        typeof badge === 'string'
+          ? badge
+          : badge?.id;
+
+      if (!badgeId) {
+        return null;
+      }
+
+      return {
+        ...getBadgeDefinition(badgeId),
+        ...(typeof badge === 'object' ? badge : {}),
+        id: badgeId,
+      };
+    })
+    .filter(Boolean);
+
+  const badgeKey = badges.map(badge => badge.id).join('|');
 
   // =========================================================
   // VICTORY SOUND
@@ -69,8 +92,11 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
   // =========================================================
 
   useEffect(() => {
+    setBadgeIndex(0);
+    setShowBadgePopup(false);
+
     if (badges.length === 0) {
-      return;
+      return undefined;
     }
 
     const timer = setTimeout(() => {
@@ -80,7 +106,7 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
     return () => {
       clearTimeout(timer);
     };
-  }, [badges.length]);
+  }, [badgeKey, badges.length]);
 
   const handleBadgeContinue = () => {
     if (badgeIndex < badges.length - 1) {
@@ -138,7 +164,7 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
 
       <BadgeUnlockModal
         visible={showBadgePopup}
-        badgeId={badges[badgeIndex]}
+        badgeId={badges[badgeIndex]?.id}
         onClose={handleBadgeContinue}
       />
 
@@ -255,8 +281,12 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
 
                   {badges.map(badge => (
                     <View key={badge.id} style={styles.badgeRow}>
-                      <View style={styles.badgeIconPlaceholder}>
-                        <Text style={styles.badgeIconText}>★</Text>
+                      <View style={styles.badgeIconWrap}>
+                        <BadgeIcon
+                          badgeId={badge.id}
+                          unlocked
+                          size={46}
+                        />
                       </View>
 
                       <View style={styles.badgeTextContainer}>
@@ -486,28 +516,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  badgeIconPlaceholder: {
-    width: 42,
-
-    height: 42,
-
-    borderRadius: 21,
-
-    backgroundColor: COLORS.primary,
-
+  badgeIconWrap: {
+    width: 54,
     alignItems: 'center',
-
     justifyContent: 'center',
-
-    marginRight: 12,
-  },
-
-  badgeIconText: {
-    color: COLORS.text,
-
-    fontSize: 19,
-
-    fontWeight: 'bold',
+    marginRight: 10,
   },
 
   badgeTextContainer: {

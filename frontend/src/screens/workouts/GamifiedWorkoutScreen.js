@@ -64,9 +64,8 @@ const getApiErrorMessage = error => {
 };
 
 function GamifiedWorkoutScreen({
-  // TODO:
-  // Replace with Group 1's
-  // workout assignment.
+  assignmentId,
+
   workoutId = 'W001',
 
   onCompleteWorkout = () => {},
@@ -249,6 +248,8 @@ function GamifiedWorkoutScreen({
     }));
 
     return {
+      assignmentId,
+
       workoutId: workout.workoutId,
 
       workoutName: workout.name,
@@ -287,6 +288,8 @@ function GamifiedWorkoutScreen({
       }
 
       const resultPayload = {
+        assignmentId: summary.assignmentId,
+
         workoutId: summary.workoutId,
 
         condition: summary.condition,

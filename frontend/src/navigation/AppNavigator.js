@@ -1,28 +1,17 @@
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
-
 import NonGamifiedWorkoutScreen from '../screens/workouts/NonGamifiedWorkoutScreen';
-
 import GamifiedWorkoutScreen from '../screens/workouts/GamifiedWorkoutScreen';
-
 import WorkoutSummaryScreen from '../screens/workouts/WorkoutSummaryScreen';
-
 import GamifiedWorkoutSummaryScreen from '../screens/workouts/GamifiedWorkoutSummaryScreen';
-
 import GamificationStatsAwardsScreen from '../screens/gamificationstats/GamificationStatsAwardsScreen';
-
 import PostWorkoutSurveyScreen from '../screens/survey/PostWorkoutSurveyScreen';
-
 import WelcomeScreen from '../screens/welcome page/WelcomeScreen';
-
 import RegisterScreen from '../screens/auth/registerPage';
-
 import LoginScreen from '../screens/auth/loginPage';
 
-
 import MainTabs from './MainTabs';
-
 import {COLORS} from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
@@ -31,6 +20,9 @@ function NonGamifiedWorkoutRoute({
   navigation,
   route,
 }) {
+  const assignmentId =
+    route.params?.assignmentId ?? null;
+
   const workoutId =
     route.params?.workoutId ?? 'W001';
 
@@ -39,12 +31,14 @@ function NonGamifiedWorkoutRoute({
 
   return (
     <NonGamifiedWorkoutScreen
+      assignmentId={assignmentId}
       workoutId={workoutId}
       onCompleteWorkout={summary => {
         navigation.replace(
           'NonGamifiedSummary',
           {
             summary,
+            assignmentId,
             participantId,
           },
         );
@@ -60,6 +54,9 @@ function GamifiedWorkoutRoute({
   navigation,
   route,
 }) {
+  const assignmentId =
+    route.params?.assignmentId ?? null;
+
   const workoutId =
     route.params?.workoutId ?? 'W001';
 
@@ -68,12 +65,14 @@ function GamifiedWorkoutRoute({
 
   return (
     <GamifiedWorkoutScreen
+      assignmentId={assignmentId}
       workoutId={workoutId}
       onCompleteWorkout={summary => {
         navigation.replace(
           'GamifiedSummary',
           {
             summary,
+            assignmentId,
             participantId,
           },
         );
@@ -92,6 +91,11 @@ function NonGamifiedSummaryRoute({
   const summary =
     route.params?.summary ?? null;
 
+  const assignmentId =
+    route.params?.assignmentId ??
+    summary?.assignmentId ??
+    null;
+
   const participantId =
     route.params?.participantId ?? null;
 
@@ -102,6 +106,7 @@ function NonGamifiedSummaryRoute({
         navigation.replace(
           'PostWorkoutSurvey',
           {
+            assignmentId,
             participantId,
             workoutId:
               summary?.workoutId ?? null,
@@ -121,6 +126,11 @@ function GamifiedSummaryRoute({
   const summary =
     route.params?.summary ?? null;
 
+  const assignmentId =
+    route.params?.assignmentId ??
+    summary?.assignmentId ??
+    null;
+
   const participantId =
     route.params?.participantId ?? null;
 
@@ -131,6 +141,7 @@ function GamifiedSummaryRoute({
         navigation.replace(
           'PostWorkoutSurvey',
           {
+            assignmentId,
             participantId,
             workoutId:
               summary?.workoutId ?? null,
@@ -156,11 +167,30 @@ function AppNavigator() {
         },
       }}
     >
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen
+        name="Welcome"
+        component={WelcomeScreen}
+      />
+
+      <Stack.Screen
+        name="Register"
+        component={RegisterScreen}
+      />
+
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+      />
+
+      <Stack.Screen
+        name="Onboarding"
+        component={OnboardingScreen}
+      />
+
+      <Stack.Screen
+        name="MainTabs"
+        component={MainTabs}
+      />
 
       <Stack.Screen
         name="NonGamifiedWorkout"
@@ -197,16 +227,12 @@ function AppNavigator() {
         }
       />
 
-        {/* GAMIFICATION STATS & AWARDS ROUTE */}
       <Stack.Screen
         name="GamificationStatsAwards"
         component={
           GamificationStatsAwardsScreen
         }
       />
-
-
-
     </Stack.Navigator>
   );
 }
