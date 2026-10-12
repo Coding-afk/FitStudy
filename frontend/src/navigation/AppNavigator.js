@@ -18,6 +18,8 @@ import WelcomeScreen from '../screens/welcome page/WelcomeScreen';
 
 import RegisterScreen from '../screens/auth/registerPage';
 
+import LoginScreen from '../screens/auth/loginPage';
+
 
 import MainTabs from './MainTabs';
 
@@ -156,6 +158,7 @@ function AppNavigator() {
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
 

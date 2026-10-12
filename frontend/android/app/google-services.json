@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "137284125173",
+    "project_id": "fitstudy-f87b6",
+    "storage_bucket": "fitstudy-f87b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:137284125173:android:8bc08c5408875a51cae0bc",
+        "android_client_info": {
+          "package_name": "com.FitStudy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhpsx5T30pPQ0xcHAcWQg7Eo-KyjP95nk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

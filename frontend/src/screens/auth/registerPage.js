@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { COLORS } from '../../constants/theme';
 
 export default function RegisterScreen({ navigation }) {
@@ -34,25 +36,22 @@ export default function RegisterScreen({ navigation }) {
     if (!validate()) return;
     setLoading(true);
     try {
-      // TODO: connect to Firebase Authentication
-      // For now navigate to onboarding with username as participantId
+      const email = `${username.trim().toLowerCase()}@fitstudy.app`;
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
       const participantId = '#FIT-' + Math.floor(10000 + Math.random() * 90000);
-      navigation.reset({
-        index: 0,
-
-        routes: [
-          {
-            name: 'MainTabs',
-
-            params: {
-              participantId,
-              username,
-            },
-          },
-        ],
+      await firestore().collection('users').doc(userCredential.user.uid).set({
+        username: username.trim(),
+        participantId,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        workoutsCompleted: 0,
       });
+      navigation.navigate('Onboarding', { participantId, username: username.trim() });
     } catch (error) {
-      Alert.alert('Registration failed', error.message);
+      if (error.code === 'auth/email-already-in-use') {
+        setErrors({ username: 'This username is already taken. Try another.' });
+      } else {
+        Alert.alert('Registration failed', error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -216,6 +215,7 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     backgroundColor: COLORS.primaryLight,
+    opacity: 0.5,
   },
   btnText: {
     color: COLORS.text,
