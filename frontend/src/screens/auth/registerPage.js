@@ -1,56 +1,121 @@
 import React, { useState } from 'react';
+
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
+
+import { registerUser } from '../../services/auth';
+
+import { saveProfile } from '../../services/profile';
+
 import { COLORS } from '../../constants/theme';
 
 export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState('');
+
   const [password, setPassword] = useState('');
+
   const [confirmPassword, setConfirmPassword] = useState('');
+
   const [loading, setLoading] = useState(false);
+
   const [errors, setErrors] = useState({});
 
   const validate = () => {
     const newErrors = {};
-    if (!username.trim()) newErrors.username = 'Please enter a username';
-    if (username.trim().length < 3) newErrors.username = 'Username must be at least 3 characters';
-    if (!password) newErrors.password = 'Please enter a password';
-    if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
-    if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+
+    const cleanUsername = username.trim();
+
+    if (!cleanUsername) {
+      newErrors.username = 'Please enter a username';
+    } else if (cleanUsername.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    } else if (cleanUsername.length > 20) {
+      newErrors.username = 'Username must be 20 characters or fewer';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+      newErrors.username = 'Use only letters, numbers and underscores';
+    }
+
+    if (!password) {
+      newErrors.password = 'Please enter a password';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
   };
 
   const handleRegister = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      return;
+    }
+
     setLoading(true);
+
+    setErrors({});
+
     try {
-      const email = `${username.trim().toLowerCase()}@fitstudy.app`;
-      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      await registerUser(username, password);
+
       const participantId = '#FIT-' + Math.floor(10000 + Math.random() * 90000);
-      await firestore().collection('users').doc(userCredential.user.uid).set({
+
+      const profile = await saveProfile({
         username: username.trim(),
+
         participantId,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        workoutsCompleted: 0,
       });
-      navigation.navigate('Onboarding', { participantId, username: username.trim() });
+
+      navigation.reset({
+        index: 0,
+
+        routes: [
+          {
+            name: 'MainTabs',
+
+            params: {
+              participantId: profile.studyId,
+
+              username: profile.name,
+            },
+          },
+        ],
+      });
     } catch (error) {
-      if (error.code === 'auth/email-already-in-use') {
-        setErrors({ username: 'This username is already taken. Try another.' });
+      console.error('Registration failed:', error);
+
+      const code = error?.code;
+
+      if (code === 'auth/email-already-in-use') {
+        setErrors({
+          username: 'This username is already taken.',
+        });
+      } else if (code === 'auth/weak-password') {
+        setErrors({
+          password: 'Please choose a stronger password.',
+        });
       } else {
-        Alert.alert('Registration failed', error.message);
+        const detail = error?.response?.data?.detail;
+
+        Alert.alert(
+          'Registration failed',
+
+          detail || error?.message || 'Unable to create your account.',
+        );
       }
     } finally {
       setLoading(false);
@@ -59,7 +124,6 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <View style={styles.logoWrap}>
         <View style={styles.logo}>
           <Text style={styles.logoIcon}>🏃</Text>
@@ -67,12 +131,15 @@ export default function RegisterScreen({ navigation }) {
       </View>
 
       <Text style={styles.title}>Create an account</Text>
+
       <Text style={styles.subtitle}>
-        Your account keeps track of your progress anonymously throughout the study.
+        Your account keeps track of your progress anonymously throughout the
+        study.
       </Text>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Username</Text>
+
         <TextInput
           style={[styles.input, errors.username && styles.inputError]}
           placeholder="Choose a username"
@@ -80,13 +147,19 @@ export default function RegisterScreen({ navigation }) {
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
+          autoCorrect={false}
         />
-        <Text style={styles.hint}>Don't use your real name — keep it anonymous.</Text>
+
+        <Text style={styles.hint}>
+          Don't use your real name — keep it anonymous.
+        </Text>
+
         {errors.username && <Text style={styles.error}>{errors.username}</Text>}
       </View>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Password</Text>
+
         <TextInput
           style={[styles.input, errors.password && styles.inputError]}
           placeholder="Create a password"
@@ -95,12 +168,15 @@ export default function RegisterScreen({ navigation }) {
           onChangeText={setPassword}
           secureTextEntry
         />
+
         <Text style={styles.hint}>At least 6 characters.</Text>
+
         {errors.password && <Text style={styles.error}>{errors.password}</Text>}
       </View>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Confirm password</Text>
+
         <TextInput
           style={[styles.input, errors.confirmPassword && styles.inputError]}
           placeholder="Repeat your password"
@@ -109,29 +185,35 @@ export default function RegisterScreen({ navigation }) {
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
-        {errors.confirmPassword && <Text style={styles.error}>{errors.confirmPassword}</Text>}
+
+        {errors.confirmPassword && (
+          <Text style={styles.error}>{errors.confirmPassword}</Text>
+        )}
       </View>
 
       <TouchableOpacity
         style={[styles.btn, loading && styles.btnDisabled]}
         onPress={handleRegister}
-        disabled={loading}>
-        {loading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.btnText}>Create account</Text>
-        }
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.btnText}>Create account</Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.divider}>
         <View style={styles.dividerLine} />
+
         <Text style={styles.dividerText}>already have an account?</Text>
+
         <View style={styles.dividerLine} />
       </View>
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.loginLink}>Sign in instead →</Text>
       </TouchableOpacity>
-
     </ScrollView>
   );
 }
@@ -143,10 +225,12 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
+
   logoWrap: {
     marginTop: 40,
     marginBottom: 16,
   },
+
   logo: {
     width: 56,
     height: 56,
@@ -155,9 +239,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   logoIcon: {
     fontSize: 26,
   },
+
   title: {
     fontSize: 20,
     fontWeight: '500',
@@ -165,6 +251,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+
   subtitle: {
     fontSize: 12,
     color: COLORS.textSecondary,
@@ -172,16 +259,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 24,
   },
+
   inputWrap: {
     width: '100%',
     marginBottom: 16,
   },
+
   label: {
     fontSize: 12,
     color: COLORS.textSecondary,
     fontWeight: '500',
     marginBottom: 6,
   },
+
   input: {
     backgroundColor: COLORS.card,
     borderWidth: 0.5,
@@ -191,19 +281,23 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 13,
   },
+
   inputError: {
     borderColor: '#e53e3e',
   },
+
   hint: {
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 4,
   },
+
   error: {
     fontSize: 11,
     color: '#e53e3e',
     marginTop: 4,
   },
+
   btn: {
     backgroundColor: COLORS.primary,
     borderRadius: 10,
@@ -213,15 +307,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 8,
   },
+
   btnDisabled: {
     backgroundColor: COLORS.primaryLight,
     opacity: 0.5,
   },
+
   btnText: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: '500',
   },
+
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -229,15 +326,18 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 16,
   },
+
   dividerLine: {
     flex: 1,
     height: 0.5,
     backgroundColor: COLORS.border,
   },
+
   dividerText: {
     fontSize: 11,
     color: COLORS.textSecondary,
   },
+
   loginLink: {
     fontSize: 12,
     color: COLORS.primaryLight,
