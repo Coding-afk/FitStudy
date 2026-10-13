@@ -51,7 +51,7 @@ export default function GamificationStatsAwardsScreen({ navigation, onBack }) {
 
         {/* Screen Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.screenTitle}>Gamification & Stats</Text>
+          <Text style={styles.screenTitle}>🏆 Level and Badges 🏅</Text>
           <Text style={styles.screenSubtitle}>
             Track your XP progression, workout achievements, and earned badges.
           </Text>
