@@ -33,7 +33,7 @@ def calculate_level_progress(
     total_xp: int,
 ) -> dict:
     current_level = LEVELS[0]
-    next_level = None
+    current_index = 0
 
     for index, level in enumerate(
         LEVELS
@@ -43,19 +43,19 @@ def calculate_level_progress(
             >= level["minimumXP"]
         ):
             current_level = level
-
-            if (
-                index + 1
-                < len(LEVELS)
-            ):
-                next_level = (
-                    LEVELS[index + 1]
-                )
-
+            current_index = index
         else:
             break
 
-    if next_level is None:
+
+    # ========================================================
+    # MAX LEVEL
+    # ========================================================
+
+    if (
+        current_index
+        == len(LEVELS) - 1
+    ):
         return {
             "levelStartXP":
                 current_level[
@@ -72,6 +72,18 @@ def calculate_level_progress(
                 100,
         }
 
+
+    # ========================================================
+    # NORMAL LEVEL PROGRESS
+    # ========================================================
+
+    next_level = (
+        LEVELS[
+            current_index + 1
+        ]
+    )
+
+
     level_start = (
         current_level[
             "minimumXP"
@@ -84,14 +96,17 @@ def calculate_level_progress(
         ]
     )
 
+
     xp_in_level = (
-        total_xp - level_start
+        total_xp
+        - level_start
     )
 
     level_range = (
         next_level_xp
         - level_start
     )
+
 
     progress = round(
         (
@@ -100,6 +115,7 @@ def calculate_level_progress(
         )
         * 100
     )
+
 
     return {
         "levelStartXP":
