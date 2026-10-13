@@ -9,7 +9,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Platform,
   StatusBar,
   Alert,
@@ -39,10 +38,6 @@ export default function ProfileScreen({
   const [profile, setProfile] = useState(user || {});
   const [loading, setLoading] = useState(true);
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
-
-
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,13 +56,11 @@ export default function ProfileScreen({
     }
   }, []);
 
-
   useFocusEffect(
     useCallback(() => {
       loadProfile();
     }, [loadProfile]),
   );
-
 
   const userInfo = {
     name: profile.name || 'Not assigned',
@@ -98,7 +91,6 @@ export default function ProfileScreen({
     ),
   );
 
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -110,13 +102,18 @@ export default function ProfileScreen({
     );
   }
 
-
   const handleGamificationInfo = () => {
     navigation
       .getParent()
       ?.navigate('GamificationStatsAwards');
   };
 
+  const handleUsernameReset = () => {
+    Alert.alert(
+      'Reset Username',
+      'An instructions link to update your username has been sent to your registered email.',
+    );
+  };
 
   const handlePasswordReset = () => {
     Alert.alert(
@@ -124,7 +121,6 @@ export default function ProfileScreen({
       'A password reset link has been sent to your registered email.',
     );
   };
-
 
   const handleLogout = () => {
     Alert.alert(
@@ -153,7 +149,6 @@ export default function ProfileScreen({
     );
   };
 
-
   return (
     <ScrollView
       style={styles.container}
@@ -168,7 +163,6 @@ export default function ProfileScreen({
           FitStudy Research Profile
         </Text>
       </View>
-
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
@@ -195,7 +189,6 @@ export default function ProfileScreen({
           </Text>
         </View>
       </View>
-
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
@@ -232,10 +225,9 @@ export default function ProfileScreen({
         </Text>
       </View>
 
-
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
-          Gamification Details
+         🏆 Awards and Badges Details 🏅
         </Text>
 
         <TouchableOpacity
@@ -243,48 +235,24 @@ export default function ProfileScreen({
           onPress={handleGamificationInfo}
         >
           <Text style={styles.buttonText}>
-            View Gamification Information
+           🔥 View Awards & Badges 🔥
           </Text>
         </TouchableOpacity>
       </View>
-
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
           Settings & Preferences
         </Text>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.infoLabel}>
-            Notifications
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleUsernameReset}
+        >
+          <Text style={styles.buttonText}>
+            Reset Username
           </Text>
-
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{
-              false: COLORS.border,
-              true: COLORS.primary,
-            }}
-            thumbColor={COLORS.text}
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <Text style={styles.infoLabel}>
-            High Contrast Text
-          </Text>
-
-          <Switch
-            value={highContrast}
-            onValueChange={setHighContrast}
-            trackColor={{
-              false: COLORS.border,
-              true: COLORS.primary,
-            }}
-            thumbColor={COLORS.text}
-          />
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.button}
@@ -315,7 +283,6 @@ export default function ProfileScreen({
     </ScrollView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -428,13 +395,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 8,
     textAlign: 'right',
-  },
-
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
   },
 
   button: {

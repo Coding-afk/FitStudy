@@ -3,7 +3,7 @@ export const BADGES = {
     id: 'game_on',
     name: 'Game On',
     shortLabel: 'GO',
-    symbol: '▶',
+    symbol: '🕹️',
     description: 'Complete your first gamified workout.',
   },
 
@@ -11,7 +11,7 @@ export const BADGES = {
     id: 'perfect_start',
     name: 'Perfect Start',
     shortLabel: 'PS',
-    symbol: '★',
+    symbol: '👟',
     description: 'Complete your first perfect gamified workout.',
   },
 
@@ -19,7 +19,7 @@ export const BADGES = {
     id: 'challenge_accepted',
     name: 'Challenge Accepted',
     shortLabel: 'CA',
-    symbol: '✓',
+    symbol: '🤺',
     description: 'Complete your first workout challenge.',
   },
 
@@ -27,7 +27,7 @@ export const BADGES = {
     id: 'xp_hunter',
     name: 'XP Hunter',
     shortLabel: 'XP',
-    symbol: '⚡',
+    symbol: '🏹',
     description: 'Earn a total of 500 XP.',
   },
 
@@ -35,7 +35,7 @@ export const BADGES = {
     id: 'high_achiever',
     name: 'High Achiever',
     shortLabel: 'HA',
-    symbol: '▲',
+    symbol: '🧗',
     description: 'Reach Level 3.',
   },
 
@@ -43,7 +43,7 @@ export const BADGES = {
     id: 'perfect_pair',
     name: 'Perfect Pair',
     shortLabel: 'PP',
-    symbol: '★★',
+    symbol: '⚔️',
     description: 'Complete two perfect gamified workouts.',
   },
 
@@ -51,7 +51,7 @@ export const BADGES = {
     id: 'champion',
     name: 'Champion',
     shortLabel: 'CH',
-    symbol: '♛',
+    symbol: '🏆',
     description: 'Reach Level 5.',
   },
 
@@ -59,7 +59,7 @@ export const BADGES = {
     id: 'game_complete',
     name: 'Game Complete',
     shortLabel: 'GC',
-    symbol: '✓',
+    symbol: '👑',
     description: 'Complete all 5 gamified workouts.',
   },
 };
