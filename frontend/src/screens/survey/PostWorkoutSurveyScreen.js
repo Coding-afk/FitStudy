@@ -20,6 +20,9 @@ import { COLORS } from '../../constants/theme';
 
 export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
   const participantId = route?.params?.participantId ?? null;
+  const assignmentId = route?.params?.assignmentId ?? null;
+  const workoutId = route?.params?.workoutId ?? null;
+  const condition = route?.params?.condition ?? null;
 
   const [motivation, setMotivation] = useState(null);
 
@@ -75,6 +78,9 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
     setIsSubmitting(true);
 
     const payload = {
+      assignmentId,
+      workoutId,
+      condition,
       motivation,
       engagement,
       easeOfUse,
