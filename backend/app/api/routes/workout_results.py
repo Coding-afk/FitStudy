@@ -14,6 +14,10 @@ from app.services.gamification import (
     get_set_counts,
     process_gamified_workout,
 )
+from app.services.workout_validation import (
+    WorkoutValidationError,
+    validate_exercise_results_against_workout,
+)
 
 
 router = APIRouter(
@@ -54,6 +58,11 @@ def create_workout_result(
         .document(result.assignmentId)
     )
 
+    workout_ref = (
+        db.collection("workouts")
+        .document(result.workoutId)
+    )
+
     user_ref = (
         db.collection("users")
         .document(user_id)
@@ -64,15 +73,6 @@ def create_workout_result(
         .document(user_id)
     )
 
-    completed_sets, total_sets = get_set_counts(
-        result.exerciseResults
-    )
-
-    fully_completed = (
-        total_sets > 0
-        and completed_sets == total_sets
-    )
-
     base_result_data = result.model_dump()
 
     transaction = db.transaction()
@@ -80,12 +80,7 @@ def create_workout_result(
     @firestore.transactional
     def complete_workout(transaction):
         # ====================================================
-        # READ EVERYTHING FIRST
-        #
-        # Firestore transactions may retry automatically.
-        # Keeping every validation read inside the transaction
-        # prevents two simultaneous submissions from both
-        # awarding XP or incrementing counters.
+        # READ EVERYTHING BEFORE WRITING.
         # ====================================================
 
         assignment_document = assignment_ref.get(
@@ -96,19 +91,16 @@ def create_workout_result(
             transaction=transaction
         )
 
+        workout_document = workout_ref.get(
+            transaction=transaction
+        )
+
         user_document = user_ref.get(
             transaction=transaction
         )
 
-        stats_document = None
-
-        if result.condition == "gamified":
-            stats_document = stats_ref.get(
-                transaction=transaction
-            )
-
         # ====================================================
-        # VALIDATE ASSIGNMENT
+        # VALIDATE ASSIGNMENT.
         # ====================================================
 
         if not assignment_document.exists:
@@ -117,10 +109,7 @@ def create_workout_result(
                 detail="Workout assignment not found.",
             )
 
-        assignment = (
-            assignment_document.to_dict()
-            or {}
-        )
+        assignment = assignment_document.to_dict() or {}
 
         if assignment.get("userId") != user_id:
             raise HTTPException(
@@ -131,9 +120,6 @@ def create_workout_result(
                 ),
             )
 
-        # A result document is the strongest duplicate check.
-        # If it exists, this exact assignment has already been
-        # submitted and must never award XP/counters again.
         if existing_result_document.exists:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -146,9 +132,7 @@ def create_workout_result(
         if assignment.get("status") == "completed":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "This assignment has already been completed."
-                ),
+                detail="This assignment has already been completed.",
             )
 
         if assignment.get("status") != "in_progress":
@@ -163,23 +147,56 @@ def create_workout_result(
         if assignment.get("workoutId") != result.workoutId:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Workout ID does not match the assigned "
-                    "workout."
-                ),
+                detail="Workout ID does not match the assigned workout.",
             )
 
         if assignment.get("condition") != result.condition:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    "Workout condition does not match the "
-                    "assignment."
+                    "Workout condition does not match the assignment."
                 ),
             )
 
         # ====================================================
-        # VALIDATE USER PROFILE
+        # VALIDATE THE RESULT AGAINST THE REAL WORKOUT.
+        # The stored Firestore workout is authoritative.
+        # ====================================================
+
+        if not workout_document.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assigned workout definition was not found.",
+            )
+
+        workout_data = workout_document.to_dict() or {}
+
+        try:
+            canonical_exercise_results = (
+                validate_exercise_results_against_workout(
+                    result.exerciseResults,
+                    workout_data,
+                )
+            )
+        except WorkoutValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+
+        # It is now safe to count submitted sets because their structure
+        # exactly matches the server-side workout definition.
+        completed_sets, total_sets = get_set_counts(
+            result.exerciseResults
+        )
+
+        fully_completed = (
+            total_sets > 0
+            and completed_sets == total_sets
+        )
+
+        # ====================================================
+        # VALIDATE USER PROFILE.
         # ====================================================
 
         if not user_document.exists:
@@ -191,10 +208,26 @@ def create_workout_result(
         user_data = user_document.to_dict() or {}
 
         # ====================================================
-        # PREPARE RESULT + GAMIFICATION
+        # READ GAMIFICATION STATS ONLY FOR GAMIFIED WORKOUTS.
+        # This read still happens before any write.
+        # ====================================================
+
+        stats_document = None
+
+        if result.condition == "gamified":
+            stats_document = stats_ref.get(
+                transaction=transaction
+            )
+
+        # ====================================================
+        # PREPARE RESULT + GAMIFICATION.
         # ====================================================
 
         result_data = dict(base_result_data)
+
+        # Never trust client-supplied exercise names/units when storing.
+        # The canonical copy comes from the server-side workout document.
+        result_data["exerciseResults"] = canonical_exercise_results
 
         result_data.update({
             "resultId": result.assignmentId,
@@ -206,15 +239,13 @@ def create_workout_result(
         })
 
         gamification_response = None
+        updated_stats = None
 
         if result.condition == "gamified":
             current_stats = None
 
             if stats_document and stats_document.exists:
-                current_stats = (
-                    stats_document.to_dict()
-                    or {}
-                )
+                current_stats = stats_document.to_dict() or {}
 
             gamification_data = process_gamified_workout(
                 user_id=user_id,
@@ -239,7 +270,7 @@ def create_workout_result(
             )
 
         # ====================================================
-        # CALCULATE USER COUNTERS FROM THE TRANSACTION SNAPSHOT
+        # USER COUNTERS.
         # ====================================================
 
         workouts_completed = int(
@@ -268,7 +299,7 @@ def create_workout_result(
         }
 
         # ====================================================
-        # WRITE EVERYTHING IN ONE TRANSACTION
+        # WRITE EVERYTHING IN ONE TRANSACTION.
         # ====================================================
 
         transaction.set(
@@ -289,7 +320,10 @@ def create_workout_result(
             user_updates,
         )
 
-        if result.condition == "gamified":
+        if (
+            result.condition == "gamified"
+            and updated_stats is not None
+        ):
             transaction.set(
                 stats_ref,
                 updated_stats,
@@ -306,6 +340,7 @@ def create_workout_result(
             "totalSets": total_sets,
             "fullyCompleted": fully_completed,
             "gamification": gamification_response,
+            "finalRewardUnlocked": workouts_completed >= 10,
         }
 
     return complete_workout(transaction)

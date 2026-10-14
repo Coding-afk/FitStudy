@@ -6,6 +6,8 @@ import GamifiedWorkoutScreen from '../screens/workouts/GamifiedWorkoutScreen';
 import WorkoutSummaryScreen from '../screens/workouts/WorkoutSummaryScreen';
 import GamifiedWorkoutSummaryScreen from '../screens/workouts/GamifiedWorkoutSummaryScreen';
 import GamificationStatsAwardsScreen from '../screens/gamificationstats/GamificationStatsAwardsScreen';
+import PerfectWorkoutScreen from '../screens/workouts/PerfectWorkoutScreen';
+import PerfectWorkoutCompleteScreen from '../screens/workouts/PerfectWorkoutCompleteScreen';
 import PostWorkoutSurveyScreen from '../screens/survey/PostWorkoutSurveyScreen';
 import WelcomeScreen from '../screens/welcome page/WelcomeScreen';
 import RegisterScreen from '../screens/auth/registerPage';
@@ -154,6 +156,17 @@ function GamifiedSummaryRoute({
   );
 }
 
+
+function PerfectWorkoutRoute({
+  navigation,
+}) {
+  return (
+    <PerfectWorkoutScreen
+      navigation={navigation}
+    />
+  );
+}
+
 function AppNavigator() {
   return (
     <Stack.Navigator
@@ -232,6 +245,16 @@ function AppNavigator() {
         component={
           GamificationStatsAwardsScreen
         }
+      />
+
+      <Stack.Screen
+        name="PerfectWorkout"
+        component={PerfectWorkoutRoute}
+      />
+
+      <Stack.Screen
+        name="PerfectWorkoutComplete"
+        component={PerfectWorkoutCompleteScreen}
       />
     </Stack.Navigator>
   );
