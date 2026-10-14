@@ -24,6 +24,8 @@ import {
 
 import { getWorkout } from '../../services/workouts';
 
+import { getPerfectWorkoutReward } from '../../services/rewards';
+
 import { COLORS } from '../../constants/theme';
 
 export default function WorkoutSelectionScreen({ navigation }) {
@@ -38,6 +40,8 @@ export default function WorkoutSelectionScreen({ navigation }) {
   const [totalCount, setTotalCount] = useState(10);
 
   const [allCompleted, setAllCompleted] = useState(false);
+
+  const [rewardCompleted, setRewardCompleted] = useState(false);
 
   const [showAllCompleted, setShowAllCompleted] = useState(false);
 
@@ -109,15 +113,45 @@ export default function WorkoutSelectionScreen({ navigation }) {
 
         await loadCompletedAssignments(assignments);
 
-        setCompletedCount(
-          nextData?.completedCount ?? allData?.completedCount ?? 0,
-        );
+        const resolvedCompletedCount =
+          nextData?.completedCount ?? allData?.completedCount ?? 0;
 
-        setTotalCount(nextData?.totalCount ?? allData?.totalCount ?? 10);
+        const resolvedTotalCount =
+          nextData?.totalCount ?? allData?.totalCount ?? 10;
+
+        setCompletedCount(resolvedCompletedCount);
+
+        setTotalCount(resolvedTotalCount);
 
         setAllCompleted(nextData?.allCompleted ?? false);
 
         setAssignment(nextData?.assignment ?? null);
+
+        if (
+          resolvedTotalCount > 0 &&
+          resolvedCompletedCount >= resolvedTotalCount
+        ) {
+          try {
+            const rewardData = await getPerfectWorkoutReward();
+
+            setRewardCompleted(
+              Boolean(rewardData?.rewardCompleted),
+            );
+          } catch (rewardError) {
+            console.warn(
+              'Unable to load Perfect Workout reward status:',
+              rewardError,
+            );
+
+            /*
+             * Do not fail the Home screen just because reward status
+             * could not be loaded. The user can retry by refreshing.
+             */
+            setRewardCompleted(false);
+          }
+        } else {
+          setRewardCompleted(false);
+        }
       } catch (requestError) {
         console.error('Failed to load home:', requestError);
 
@@ -226,7 +260,7 @@ export default function WorkoutSelectionScreen({ navigation }) {
           styles.container,
 
           {
-            paddingBottom: 150 + tabBarHeight,
+            paddingBottom: 210 + tabBarHeight,
           },
         ]}
         refreshControl={
@@ -324,9 +358,13 @@ export default function WorkoutSelectionScreen({ navigation }) {
         )}
       </ScrollView>
 
-      <ProgressLockCard
+      <PerfectRewardCard
         completedCount={completedCount}
         totalCount={totalCount}
+        rewardCompleted={rewardCompleted}
+        onStartReward={() =>
+          navigation.getParent()?.navigate('PerfectWorkout')
+        }
       />
     </View>
   );
@@ -358,41 +396,52 @@ function CompletedWorkoutRow({ assignment }) {
   );
 }
 
-function ProgressLockCard({ completedCount, totalCount }) {
-  const finalWorkoutReady = completedCount === totalCount - 1;
-
-  const finished = completedCount >= totalCount;
-
-  let statusTitle = 'FINAL WORKOUT LOCKED';
-
-  let message = 'Complete your remaining workouts to unlock the final workout.';
-
-  if (finalWorkoutReady) {
-    statusTitle = 'FINAL WORKOUT UNLOCKED';
-
-    message = 'Your final workout is ready.';
-  }
-
-  if (finished) {
-    statusTitle = 'STUDY COMPLETE';
-
-    message = 'All assigned workouts have been completed.';
-  }
+function PerfectRewardCard({
+  completedCount,
+  totalCount,
+  rewardCompleted,
+  onStartReward,
+}) {
+  const unlocked = completedCount >= totalCount && totalCount > 0;
 
   const progress =
     totalCount > 0 ? Math.min(completedCount / totalCount, 1) : 0;
 
+  let icon = '🔒';
+  let status = 'PERFECT WORKOUT LOCKED';
+  let message =
+    'Complete all 10 study workouts to unlock your bonus Perfect Workout.';
+  let buttonLabel = 'Start Perfect Workout';
+
+  if (unlocked) {
+    icon = '🏆';
+    status = 'PERFECT WORKOUT UNLOCKED';
+    message = 'Your bonus reward workout is ready.';
+  }
+
+  if (unlocked && rewardCompleted) {
+    icon = '🏅';
+    status = 'PERFECT WORKOUT COMPLETED';
+    message =
+      'You earned the FitStudy Complete award. Replay your bonus workout anytime.';
+    buttonLabel = 'Replay Perfect Workout';
+  }
+
   return (
-    <View style={styles.progressFloatingCard}>
+    <View
+      style={[
+        styles.progressFloatingCard,
+        unlocked && styles.rewardUnlockedCard,
+        rewardCompleted && styles.rewardCompletedCard,
+      ]}
+    >
       <View style={styles.progressTopRow}>
         <View style={styles.lockBadge}>
-          <Text style={styles.lockIcon}>
-            {finished ? '✓' : finalWorkoutReady ? '🔓' : '🔒'}
-          </Text>
+          <Text style={styles.lockIcon}>{icon}</Text>
         </View>
 
         <View style={styles.progressTextArea}>
-          <Text style={styles.progressStatus}>{statusTitle}</Text>
+          <Text style={styles.progressStatus}>{status}</Text>
 
           <Text style={styles.progressMessage}>{message}</Text>
         </View>
@@ -406,13 +455,21 @@ function ProgressLockCard({ completedCount, totalCount }) {
         <View
           style={[
             styles.progressFill,
-
             {
               width: `${progress * 100}%`,
             },
           ]}
         />
       </View>
+
+      {unlocked && (
+        <TouchableOpacity
+          style={styles.rewardButton}
+          onPress={onStartReward}
+        >
+          <Text style={styles.rewardButtonText}>{buttonLabel}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -865,6 +922,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
 
     fontWeight: '800',
+  },
+
+
+  rewardUnlockedCard: {
+    borderColor: '#67D391',
+  },
+
+  rewardCompletedCard: {
+    borderColor: '#D9B65D',
+  },
+
+  rewardButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 9,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 11,
+  },
+
+  rewardButtonText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   progressBackground: {

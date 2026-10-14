@@ -62,6 +62,14 @@ export const BADGES = {
     symbol: '👑',
     description: 'Complete all 5 gamified workouts.',
   },
+
+  fitstudy_complete: {
+    id: 'fitstudy_complete',
+    name: 'FitStudy Complete',
+    shortLabel: 'FC',
+    symbol: '🏅',
+    description: 'Complete all 10 study workouts and finish the Perfect Workout.',
+  },
 };
 
 export const BADGE_ORDER = [
@@ -73,6 +81,7 @@ export const BADGE_ORDER = [
   'perfect_pair',
   'champion',
   'game_complete',
+  'fitstudy_complete',
 ];
 
 export const getBadgeDefinition = badgeId => {

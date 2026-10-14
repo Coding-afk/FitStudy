@@ -264,9 +264,27 @@ def get_my_gamification_stats(
         )
     )
 
+    user_document = (
+        db.collection("users")
+        .document(user_id)
+        .get()
+    )
+
+    user_data = (
+        user_document.to_dict()
+        if user_document.exists
+        else {}
+    ) or {}
+
     return {
         **stats,
         **level_progress,
+        "finalRewardCompleted": bool(
+            user_data.get(
+                "finalRewardCompleted",
+                False,
+            )
+        ),
     }
 
 

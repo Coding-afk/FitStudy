@@ -23,6 +23,10 @@ from app.models.assignment import (
     NextAssignmentResponse,
 )
 
+from app.services.assignment_logic import (
+    get_next_incomplete_assignment,
+)
+
 
 router = APIRouter(
     prefix="/assignments",
@@ -426,17 +430,10 @@ def get_next_assignment(
     )
 
 
-    next_assignment = next(
-        (
-            assignment
-            for assignment
-            in assignments
-            if assignment.get(
-                "status"
-            )
-            != "completed"
-        ),
-        None,
+    next_assignment = (
+        get_next_incomplete_assignment(
+            assignments
+        )
     )
 
 
@@ -496,12 +493,71 @@ def start_assignment(
         )
 
 
+    # --------------------------------------------------------
+    # ENFORCE STUDY ORDER ON THE BACKEND.
+    # The UI already shows only the next assignment, but the
+    # API must also prevent a participant from starting a
+    # later assignment directly by ID.
+    # --------------------------------------------------------
+
+    assignments = (
+        get_user_assignments(
+            user_id
+        )
+    )
+
+    next_assignment = (
+        get_next_incomplete_assignment(
+            assignments
+        )
+    )
+
+    if next_assignment is None:
+        raise HTTPException(
+            status_code=
+                status.HTTP_409_CONFLICT,
+
+            detail=
+                "All assigned study workouts have already been completed.",
+        )
+
     if (
+        next_assignment.get(
+            "assignmentId"
+        )
+        != assignment_id
+    ):
+        raise HTTPException(
+            status_code=
+                status.HTTP_409_CONFLICT,
+
+            detail=(
+                "This is not the next available workout assignment. "
+                "Complete the earlier assignment first."
+            ),
+        )
+
+
+    current_status = (
         assignment.get(
             "status"
         )
-        == "assigned"
+    )
+
+    if current_status not in (
+        "assigned",
+        "in_progress",
     ):
+        raise HTTPException(
+            status_code=
+                status.HTTP_409_CONFLICT,
+
+            detail=
+                "This assignment is not in a startable state.",
+        )
+
+
+    if current_status == "assigned":
         assignment_ref.update({
             "status":
                 "in_progress",
