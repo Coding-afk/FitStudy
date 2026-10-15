@@ -170,13 +170,11 @@ function PerfectWorkoutRoute({
 function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Welcome"
+      initialRouteName={user ? 'MainTabs' : 'Welcome'}
       screenOptions={{
         headerShown: false,
-
         contentStyle: {
-          backgroundColor:
-            COLORS.background,
+          backgroundColor: COLORS.background,
         },
       }}
     >
