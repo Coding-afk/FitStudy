@@ -58,9 +58,8 @@ const getApiErrorMessage = error => {
 };
 
 function NonGamifiedWorkoutScreen({
-  // TODO:
-  // Replace this temporary default with
-  // Group 1's assignment/navigation workoutId.
+  assignmentId,
+
   workoutId = 'W001',
 
   onCompleteWorkout = () => {},
@@ -214,6 +213,8 @@ function NonGamifiedWorkoutScreen({
     }));
 
     return {
+      assignmentId,
+
       workoutId: workout.workoutId,
 
       workoutName: workout.name,
@@ -252,6 +253,8 @@ function NonGamifiedWorkoutScreen({
       }
 
       const resultPayload = {
+        assignmentId: summary.assignmentId,
+
         workoutId: summary.workoutId,
 
         condition: summary.condition,

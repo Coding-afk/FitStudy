@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SetResult(BaseModel):
-    setNumber: int
-    actualValue: int
+    setNumber: int = Field(ge=1)
+    actualValue: int = Field(ge=0)
     completed: bool
 
 
@@ -23,6 +23,7 @@ class ExerciseResult(BaseModel):
 
 
 class WorkoutResultCreate(BaseModel):
+    assignmentId: str
     workoutId: str
 
     condition: Literal[
@@ -33,7 +34,7 @@ class WorkoutResultCreate(BaseModel):
     startedAt: datetime
     completedAt: datetime
 
-    completionTimeSeconds: int
+    completionTimeSeconds: int = Field(ge=1)
 
     exerciseResults: list[
         ExerciseResult

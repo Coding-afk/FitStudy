@@ -4,7 +4,8 @@ import {
   View,
   Text,
   StyleSheet,
-  Button,
+  TouchableOpacity,
+  ActivityIndicator,
   ScrollView,
   Alert,
   Platform,
@@ -19,6 +20,9 @@ import { COLORS } from '../../constants/theme';
 
 export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
   const participantId = route?.params?.participantId ?? null;
+  const assignmentId = route?.params?.assignmentId ?? null;
+  const workoutId = route?.params?.workoutId ?? null;
+  const condition = route?.params?.condition ?? null;
 
   const [motivation, setMotivation] = useState(null);
 
@@ -74,6 +78,9 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
     setIsSubmitting(true);
 
     const payload = {
+      assignmentId,
+      workoutId,
+      condition,
       motivation,
       engagement,
       easeOfUse,
@@ -111,42 +118,48 @@ export default function PostWorkoutSurveyScreen({ navigation, route, onBack }) {
       </Text>
 
       <RatingSelector
-        label="1. How motivated were you during this session?"
+        label="1. I felt focused and driven to complete the exercises in today's session."
         value={motivation}
         onSelect={setMotivation}
       />
 
       <RatingSelector
-        label="2. How engaging was the workout routine?"
+        label="2. The interface and activity kept my attention throughout the routine."
         value={engagement}
         onSelect={setEngagement}
       />
 
       <RatingSelector
-        label="3. How easy was it to follow the instructions?"
+        label="3. The instructions and visual prompts were clear and straightforward to follow"
         value={easeOfUse}
         onSelect={setEaseOfUse}
       />
 
       <RatingSelector
-        label="4. How likely are you to maintain workout consistency with this routine?"
+        label="4. I would be inclined to complete similar workout sessions on a regular schedule."
         value={perceivedConsistency}
         onSelect={setPerceivedConsistency}
       />
 
       <RatingSelector
-        label="5. How useful was this session in helping achieve your fitness goals?"
+        label="5. Today's session provided a valuable and effective exercise experience."
         value={perceivedUsefulness}
         onSelect={setPerceivedUsefulness}
       />
 
       <View style={styles.submitSection}>
-        <Button
-          title={isSubmitting ? 'Submitting...' : 'Submit Survey'}
+        <TouchableOpacity
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
           onPress={handleSubmit}
           disabled={isSubmitting}
-          color={COLORS.primaryLight}
-        />
+          activeOpacity={0.8}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={COLORS.text} />
+          ) : (
+            <Text style={styles.submitButtonText}>Submit Survey</Text>
+          )}
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -182,5 +195,25 @@ const styles = StyleSheet.create({
   submitSection: {
     marginTop: 32,
     marginBottom: 40,
+  },
+
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+  },
+
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+
+  submitButtonText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

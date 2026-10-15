@@ -1,66 +1,99 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  useCallback,
+  useState,
+} from 'react';
+
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Platform,
   StatusBar,
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import {getProfile} from '../../services/profile';
-import { COLORS } from '../../constants/theme';
 
-export default function ProfileScreen({ user, navigation, route }) {
+import {
+  useFocusEffect,
+} from '@react-navigation/native';
+
+import {
+  getProfile,
+} from '../../services/profile';
+
+import {
+  COLORS,
+} from '../../constants/theme';
+
+
+export default function ProfileScreen({
+  user,
+  navigation,
+  route,
+}) {
   const participantId = route?.params?.participantId ?? null;
 
   const [profile, setProfile] = useState(user || {});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const data = await getProfile();
-        console.log('Profile data received:', data)
-        setProfile(data);
-      } catch (error) {
-        console.error('Failed to load profile:', error);
-        Alert.alert('Error', 'Unable to load your profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProfile();
+  const loadProfile = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const data = await getProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+
+      Alert.alert(
+        'Error',
+        'Unable to load your profile',
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile]),
+  );
 
   const userInfo = {
     name: profile.name || 'Not assigned',
-    studyId: profile.studyId || participantId || 'Not assigned',
+    studyId:
+      profile.studyId ||
+      participantId ||
+      'Not assigned',
     group: profile.group || 'Not assigned',
-    completedGamified: profile.completedGamified ?? 0,
-    completedNonGamified: profile.completedNonGamified ?? 0,
+    completedGamified: Number(profile.completedGamified ?? 0),
+    completedNonGamified: Number(profile.completedNonGamified ?? 0),
     totalTarget: 10,
   };
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
-
-  const gamifiedProgress = Math.min(
-    Math.max(userInfo.completedGamified / userInfo.totalTarget, 0),
-    1
+  const completedWorkouts = Math.min(
+    userInfo.totalTarget,
+    Math.max(
+      0,
+      userInfo.completedGamified +
+        userInfo.completedNonGamified,
+    ),
   );
 
-  const nonGamifiedProgress = Math.min(
-    Math.max(userInfo.completedNonGamified / userInfo.totalTarget, 0),
-    1
+  const overallProgress = Math.min(
+    1,
+    Math.max(
+      0,
+      completedWorkouts / userInfo.totalTarget,
+    ),
   );
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator
           size="large"
           color={COLORS.primary}
@@ -69,157 +102,182 @@ export default function ProfileScreen({ user, navigation, route }) {
     );
   }
 
-const handleGamificationInfo = () => {
-  navigation.getParent()?.navigate('GamificationStatsAwards');
-};
+  const handleGamificationInfo = () => {
+    navigation
+      .getParent()
+      ?.navigate('GamificationStatsAwards');
+  };
+
+  const handleUsernameReset = () => {
+    Alert.alert(
+      'Reset Username',
+      'An instructions link to update your username has been sent to your registered email.',
+    );
+  };
 
   const handlePasswordReset = () => {
     Alert.alert(
       'Password Reset',
-      'A password reset link has been sent to your registered email.'
+      'A password reset link has been sent to your registered email.',
     );
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: () => {
-          navigation.getParent()?.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'Onboarding',
-              },
-            ],
-          });
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
         },
-      },
-    ]);
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => {
+            navigation.getParent()?.reset({
+              index: 0,
+              routes: [
+                {
+                  name: 'Onboarding',
+                },
+              ],
+            });
+          },
+        },
+      ],
+    );
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.headerContainer}>
-        <Text style={styles.welcomeTitle}>Welcome, {userInfo.name}!</Text>
-        <Text style={styles.subtitle}>FitStudy Research Profile</Text>
+        <Text style={styles.welcomeTitle}>
+          Welcome, {userInfo.name}!
+        </Text>
+
+        <Text style={styles.subtitle}>
+          FitStudy Research Profile
+        </Text>
       </View>
 
-      {/* Study Information */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Study Information</Text>
+        <Text style={styles.cardTitle}>
+          Study Information
+        </Text>
 
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Participant ID:</Text>
-          <Text style={styles.infoValue}>{userInfo.studyId}</Text>
+          <Text style={styles.infoLabel}>
+            Participant ID:
+          </Text>
+
+          <Text style={styles.infoValue}>
+            {userInfo.studyId}
+          </Text>
         </View>
 
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Assigned Cohort:</Text>
-          <Text style={styles.infoValue}>{userInfo.group}</Text>
+          <Text style={styles.infoLabel}>
+            Assigned Cohort:
+          </Text>
+
+          <Text style={styles.infoValue}>
+            {userInfo.group}
+          </Text>
         </View>
       </View>
 
-      {/* Overall Workout Completion */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Overall Workout Completion</Text>
+        <Text style={styles.cardTitle}>
+          Overall Workout Completion
+        </Text>
 
-        <View style={styles.progressGroup}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Gamified Workouts</Text>
-            <Text style={styles.progressValue}>
-              {userInfo.completedGamified} / {userInfo.totalTarget}
-            </Text>
-          </View>
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressLabel}>
+            Completed Workouts
+          </Text>
 
-          <View style={styles.progressBarBackground}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${gamifiedProgress * 100}%`,
-                  backgroundColor: COLORS.primary,
-                },
-              ]}
-            />
-          </View>
+          <Text style={styles.progressValue}>
+            {completedWorkouts} / {userInfo.totalTarget}
+          </Text>
         </View>
 
-        <View style={styles.progressGroup}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Non-Gamified Workouts</Text>
-            <Text style={styles.progressValue}>
-              {userInfo.completedNonGamified} / {userInfo.totalTarget}
-            </Text>
-          </View>
-
-          <View style={styles.progressBarBackground}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${nonGamifiedProgress * 100}%`,
-                  backgroundColor: COLORS.primaryLight,
-                },
-              ]}
-            />
-          </View>
+        <View style={styles.progressBarBackground}>
+          <View
+            style={[
+              styles.progressBarFill,
+              {
+                width: `${overallProgress * 100}%`,
+              },
+            ]}
+          />
         </View>
+
+        <Text style={styles.progressNote}>
+          {completedWorkouts === userInfo.totalTarget
+            ? 'All study workouts completed.'
+            : `${
+                userInfo.totalTarget - completedWorkouts
+              } workouts remaining`}
+        </Text>
       </View>
 
-      {/* Gamification Information Entry Point */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Gamification Details</Text>
-        <TouchableOpacity style={styles.button} onPress={handleGamificationInfo}>
-          <Text style={styles.buttonText}>View Gamification Information</Text>
+        <Text style={styles.cardTitle}>
+         🏆 Awards and Badges Details 🏅
+        </Text>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleGamificationInfo}
+        >
+          <Text style={styles.buttonText}>
+           🔥 View Awards & Badges 🔥
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Settings & Preferences */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Settings & Preferences</Text>
+        <Text style={styles.cardTitle}>
+          Settings & Preferences
+        </Text>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.infoLabel}>Notifications</Text>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{
-              false: COLORS.border,
-              true: COLORS.primary,
-            }}
-            thumbColor={COLORS.text}
-          />
-        </View>
-
-        <View style={styles.settingRow}>
-          <Text style={styles.infoLabel}>High Contrast Text</Text>
-          <Switch
-            value={highContrast}
-            onValueChange={setHighContrast}
-            trackColor={{
-              false: COLORS.border,
-              true: COLORS.primary,
-            }}
-            thumbColor={COLORS.text}
-          />
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
-          <Text style={styles.buttonText}>Reset Password</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleUsernameReset}
+        >
+          <Text style={styles.buttonText}>
+            Reset Username
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, styles.logoutButton]}
+          style={styles.button}
+          onPress={handlePasswordReset}
+        >
+          <Text style={styles.buttonText}>
+            Reset Password
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.logoutButton,
+          ]}
           onPress={handleLogout}
         >
-          <Text style={[styles.buttonText, styles.logoutText]}>Log Out</Text>
+          <Text
+            style={[
+              styles.buttonText,
+              styles.logoutText,
+            ]}
+          >
+            Log Out
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -232,11 +290,20 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   content: {
     paddingHorizontal: 20,
     paddingBottom: 30,
     paddingTop:
-      Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50,
+      Platform.OS === 'android'
+        ? (StatusBar.currentHeight || 24) + 16
+        : 50,
   },
 
   headerContainer: {
@@ -292,14 +359,10 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
-  progressGroup: {
-    marginVertical: 10,
-  },
-
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
 
   progressLabel: {
@@ -324,13 +387,14 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 6,
+    backgroundColor: COLORS.primary,
   },
 
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+  progressNote: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'right',
   },
 
   button: {

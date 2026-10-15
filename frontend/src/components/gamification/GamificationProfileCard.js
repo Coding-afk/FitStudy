@@ -100,6 +100,18 @@ function GamificationProfileCard() {
     ? stats.earnedBadges
     : [];
 
+  const finalRewardCompleted = Boolean(
+    stats.finalRewardCompleted,
+  );
+
+  const unlockedBadgeCount = badges.filter(badge => {
+    if (badge.id === 'fitstudy_complete') {
+      return finalRewardCompleted;
+    }
+
+    return earnedBadges.includes(badge.id);
+  }).length;
+
   return (
     <View style={styles.container}>
       {/* LEVEL */}
@@ -188,13 +200,16 @@ function GamificationProfileCard() {
         <Text style={styles.heading}>Badges</Text>
 
         <Text style={styles.badgeCount}>
-          {earnedBadges.length}/{badges.length}
+          {unlockedBadgeCount}/{badges.length}
         </Text>
       </View>
 
       <View style={styles.badgeGrid}>
         {badges.map(badge => {
-          const unlocked = earnedBadges.includes(badge.id);
+          const unlocked =
+            badge.id === 'fitstudy_complete'
+              ? finalRewardCompleted
+              : earnedBadges.includes(badge.id);
 
           return (
             <View
