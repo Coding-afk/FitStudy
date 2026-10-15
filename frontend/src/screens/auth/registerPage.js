@@ -9,12 +9,20 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
 import { COLORS } from '../../constants/theme';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const PASSWORD_RULES = [
+  { test: pw => pw.length >= 8, label: 'at least 8 characters' },
+  { test: pw => /[A-Z]/.test(pw), label: 'one uppercase letter' },
+  { test: pw => /[0-9]/.test(pw), label: 'one number' },
+  { test: pw => /[^A-Za-z0-9\s]/.test(pw), label: 'one special character' },
+];
 
 export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,8 +32,17 @@ export default function RegisterScreen({ navigation }) {
     const newErrors = {};
     if (!username.trim()) newErrors.username = 'Please enter a username';
     if (username.trim().length < 3) newErrors.username = 'Username must be at least 3 characters';
-    if (!password) newErrors.password = 'Please enter a password';
-    if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (!email.trim()) newErrors.email = 'Please enter your email address';
+    else if (!EMAIL_PATTERN.test(email.trim())) newErrors.email = 'Please enter a valid email address';
+    if (!password) {
+      newErrors.password = 'Please enter a password';
+    } else {
+
+      const missing = PASSWORD_RULES.filter(rule => !rule.test(password)).map(rule => rule.label);
+      if (missing.length > 0) {
+        newErrors.password = 'Password must include ' + missing.join(', ') + '.';
+      }
+    }
     if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
     if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
@@ -36,22 +53,12 @@ export default function RegisterScreen({ navigation }) {
     if (!validate()) return;
     setLoading(true);
     try {
-      const email = `${username.trim().toLowerCase()}@fitstudy.app`;
-      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const normalisedEmail = email.trim().toLowerCase();
+
       const participantId = '#FIT-' + Math.floor(10000 + Math.random() * 90000);
-      await firestore().collection('users').doc(userCredential.user.uid).set({
-        username: username.trim(),
-        participantId,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        workoutsCompleted: 0,
-      });
-      navigation.navigate('Onboarding', { participantId, username: username.trim() });
+      navigation.navigate('Onboarding', { participantId, username });
     } catch (error) {
-      if (error.code === 'auth/email-already-in-use') {
-        setErrors({ username: 'This username is already taken. Try another.' });
-      } else {
-        Alert.alert('Registration failed', error.message);
-      }
+      Alert.alert('Registration failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -86,6 +93,24 @@ export default function RegisterScreen({ navigation }) {
       </View>
 
       <View style={styles.inputWrap}>
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={[styles.input, errors.email && styles.inputError]}
+          placeholder="you@example.com"
+          placeholderTextColor={COLORS.textSecondary}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+        />
+        <Text style={styles.hint}>Used only to reset your password and recover your account.</Text>
+        {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+      </View>
+
+      <View style={styles.inputWrap}>
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={[styles.input, errors.password && styles.inputError]}
@@ -95,7 +120,7 @@ export default function RegisterScreen({ navigation }) {
           onChangeText={setPassword}
           secureTextEntry
         />
-        <Text style={styles.hint}>At least 6 characters.</Text>
+        <Text style={styles.hint}>At least 8 characters, with an uppercase letter, a number and a special character.</Text>
         {errors.password && <Text style={styles.error}>{errors.password}</Text>}
       </View>
 
@@ -215,7 +240,6 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     backgroundColor: COLORS.primaryLight,
-    opacity: 0.5,
   },
   btnText: {
     color: COLORS.text,
