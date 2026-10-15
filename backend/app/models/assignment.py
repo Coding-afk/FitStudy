@@ -13,8 +13,16 @@ AssignmentCondition = Literal[
 AssignmentStatus = Literal[
     "assigned",
     "in_progress",
+    "survey_pending",
     "completed",
 ]
+
+
+class ChallengeInfo(BaseModel):
+    id: str
+    name: str
+    description: str
+    xpReward: int = 50
 
 
 class AssignmentResponse(BaseModel):
@@ -30,7 +38,13 @@ class AssignmentResponse(BaseModel):
 
     assignedAt: datetime | None = None
     startedAt: datetime | None = None
+    workoutCompletedAt: datetime | None = None
+    surveyPendingAt: datetime | None = None
+    surveySubmittedAt: datetime | None = None
     completedAt: datetime | None = None
+    challengeId: str | None = None
+    challengeAssignedDate: str | None = None
+    challenge: ChallengeInfo | None = None
 
 
 class AssignmentListResponse(BaseModel):

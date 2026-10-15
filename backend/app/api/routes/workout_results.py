@@ -46,6 +46,14 @@ def create_workout_result(
     result: WorkoutResultCreate,
     current_user: dict = Depends(get_current_user),
 ):
+    """Save a finished workout and move its assignment to survey_pending.
+
+    The workout itself is complete at this point, so gamification is awarded
+    immediately. Study-completion counters are deliberately NOT incremented
+    here. The post-workout survey finalizes the assignment and advances the
+    user's X/10 study progress.
+    """
+
     user_id = _get_user_id(current_user)
 
     assignment_ref = (
@@ -78,7 +86,7 @@ def create_workout_result(
     transaction = db.transaction()
 
     @firestore.transactional
-    def complete_workout(transaction):
+    def finish_workout(transaction):
         # ====================================================
         # READ EVERYTHING BEFORE WRITING.
         # ====================================================
@@ -129,13 +137,24 @@ def create_workout_result(
                 ),
             )
 
-        if assignment.get("status") == "completed":
+        assignment_status = assignment.get("status")
+
+        if assignment_status == "survey_pending":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This workout has already been saved. Complete the "
+                    "post-workout survey to continue."
+                ),
+            )
+
+        if assignment_status == "completed":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="This assignment has already been completed.",
             )
 
-        if assignment.get("status") != "in_progress":
+        if assignment_status != "in_progress":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
@@ -159,8 +178,7 @@ def create_workout_result(
             )
 
         # ====================================================
-        # VALIDATE THE RESULT AGAINST THE REAL WORKOUT.
-        # The stored Firestore workout is authoritative.
+        # VALIDATE RESULT AGAINST THE SERVER-SIDE WORKOUT.
         # ====================================================
 
         if not workout_document.exists:
@@ -184,8 +202,6 @@ def create_workout_result(
                 detail=str(exc),
             ) from exc
 
-        # It is now safe to count submitted sets because their structure
-        # exactly matches the server-side workout definition.
         completed_sets, total_sets = get_set_counts(
             result.exerciseResults
         )
@@ -209,7 +225,6 @@ def create_workout_result(
 
         # ====================================================
         # READ GAMIFICATION STATS ONLY FOR GAMIFIED WORKOUTS.
-        # This read still happens before any write.
         # ====================================================
 
         stats_document = None
@@ -226,7 +241,6 @@ def create_workout_result(
         result_data = dict(base_result_data)
 
         # Never trust client-supplied exercise names/units when storing.
-        # The canonical copy comes from the server-side workout document.
         result_data["exerciseResults"] = canonical_exercise_results
 
         result_data.update({
@@ -235,6 +249,7 @@ def create_workout_result(
             "completedSets": completed_sets,
             "totalSets": total_sets,
             "fullyCompleted": fully_completed,
+            "surveySubmitted": False,
             "createdAt": firestore.SERVER_TIMESTAMP,
         })
 
@@ -251,6 +266,7 @@ def create_workout_result(
                 user_id=user_id,
                 current_stats=current_stats,
                 exercise_results=result.exerciseResults,
+                challenge_id=assignment.get("challengeId"),
             )
 
             updated_stats = dict(
@@ -270,36 +286,8 @@ def create_workout_result(
             )
 
         # ====================================================
-        # USER COUNTERS.
-        # ====================================================
-
-        workouts_completed = int(
-            user_data.get("workoutsCompleted", 0)
-        ) + 1
-
-        gamified_completed = int(
-            user_data.get("gamifiedCompleted", 0)
-        )
-
-        non_gamified_completed = int(
-            user_data.get("nonGamifiedCompleted", 0)
-        )
-
-        if result.condition == "gamified":
-            gamified_completed += 1
-        else:
-            non_gamified_completed += 1
-
-        user_updates = {
-            "workoutsCompleted": workouts_completed,
-            "gamifiedCompleted": gamified_completed,
-            "nonGamifiedCompleted": non_gamified_completed,
-            "finalRewardUnlocked": workouts_completed >= 10,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        }
-
-        # ====================================================
-        # WRITE EVERYTHING IN ONE TRANSACTION.
+        # WRITE WORKOUT + SURVEY-PENDING STATE ATOMICALLY.
+        # Study counters move only after the survey is saved.
         # ====================================================
 
         transaction.set(
@@ -310,14 +298,11 @@ def create_workout_result(
         transaction.update(
             assignment_ref,
             {
-                "status": "completed",
-                "completedAt": firestore.SERVER_TIMESTAMP,
+                "status": "survey_pending",
+                "workoutCompletedAt": firestore.SERVER_TIMESTAMP,
+                "surveyPendingAt": firestore.SERVER_TIMESTAMP,
+                "completedAt": None,
             },
-        )
-
-        transaction.update(
-            user_ref,
-            user_updates,
         )
 
         if (
@@ -332,15 +317,20 @@ def create_workout_result(
 
         return {
             "message": (
-                "Workout result saved and assignment completed."
+                "Workout result saved. Complete the post-workout "
+                "survey to finish this assignment."
             ),
             "resultId": result.assignmentId,
             "assignmentId": result.assignmentId,
+            "assignmentStatus": "survey_pending",
+            "surveyRequired": True,
             "completedSets": completed_sets,
             "totalSets": total_sets,
             "fullyCompleted": fully_completed,
             "gamification": gamification_response,
-            "finalRewardUnlocked": workouts_completed >= 10,
+            "finalRewardUnlocked": bool(
+                user_data.get("finalRewardUnlocked", False)
+            ),
         }
 
-    return complete_workout(transaction)
+    return finish_workout(transaction)

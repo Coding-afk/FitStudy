@@ -1,3 +1,5 @@
+import hashlib
+
 from typing import Any
 
 
@@ -15,11 +17,211 @@ PERFECT_WORKOUT_XP = 100
 # CHALLENGE
 # ============================================================
 
-DEFAULT_CHALLENGE = {
-    "id": "complete_80_percent",
-    "name": "80% Finisher",
-    "description": "Complete at least 80% of the workout sets.",
+CHALLENGES = {
+    "complete_70_percent": {
+        "id": "complete_70_percent",
+        "name": "Momentum Builder",
+        "description": "Complete at least 70% of the workout sets.",
+        "xpReward": CHALLENGE_COMPLETION_XP,
+    },
+    "complete_80_percent": {
+        "id": "complete_80_percent",
+        "name": "80% Finisher",
+        "description": "Complete at least 80% of the workout sets.",
+        "xpReward": CHALLENGE_COMPLETION_XP,
+    },
+    "complete_90_percent": {
+        "id": "complete_90_percent",
+        "name": "Almost Perfect",
+        "description": "Complete at least 90% of the workout sets.",
+        "xpReward": CHALLENGE_COMPLETION_XP,
+    },
+    "every_exercise": {
+        "id": "every_exercise",
+        "name": "Every Move Counts",
+        "description": "Complete at least one set from every exercise.",
+        "xpReward": CHALLENGE_COMPLETION_XP,
+    },
+    "two_per_exercise": {
+        "id": "two_per_exercise",
+        "name": "Consistency Run",
+        "description": "Complete at least two sets from every exercise.",
+        "xpReward": CHALLENGE_COMPLETION_XP,
+    },
+    "perfect_finish": {
+        "id": "perfect_finish",
+        "name": "Full Sweep",
+        "description": "Complete every set in the workout.",
+        "xpReward": CHALLENGE_COMPLETION_XP,
+    },
 }
+
+DEFAULT_CHALLENGE = CHALLENGES["complete_80_percent"]
+
+
+def get_challenge_definition(
+    challenge_id: str | None,
+) -> dict[str, Any]:
+    challenge = CHALLENGES.get(
+        challenge_id or "",
+        DEFAULT_CHALLENGE,
+    )
+    return dict(challenge)
+
+
+def get_eligible_challenge_ids(
+    workout_data: dict[str, Any] | None,
+) -> set[str]:
+    """Return only challenges that are actually possible for a workout.
+
+    The workout definition is the source of truth. For example,
+    ``two_per_exercise`` is excluded if even one exercise has fewer than
+    two prescribed sets. This prevents an impossible daily challenge from
+    ever being assigned.
+    """
+
+    workout_data = workout_data or {}
+    exercises = list(workout_data.get("exerciseList") or [])
+
+    set_counts = [
+        len(exercise.get("targetValues") or [])
+        for exercise in exercises
+        if isinstance(exercise, dict)
+    ]
+
+    total_sets = sum(set_counts)
+
+    if total_sets <= 0:
+        return set()
+
+    eligible = {
+        "complete_70_percent",
+        "complete_80_percent",
+        "complete_90_percent",
+        "perfect_finish",
+    }
+
+    if set_counts and all(count >= 1 for count in set_counts):
+        eligible.add("every_exercise")
+
+    if set_counts and all(count >= 2 for count in set_counts):
+        eligible.add("two_per_exercise")
+
+    return eligible
+
+
+def select_daily_challenge(
+    user_id: str,
+    assignment_id: str,
+    date_key: str,
+    excluded_ids: set[str] | None = None,
+    eligible_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Choose a stable, possible challenge for a gamified assignment.
+
+    Previously used challenge IDs can be excluded so the participant gets
+    more variety. ``eligible_ids`` limits the pool to challenges supported
+    by the actual workout structure.
+    """
+
+    excluded_ids = excluded_ids or set()
+
+    if eligible_ids is None:
+        eligible_ids = set(CHALLENGES.keys())
+    else:
+        eligible_ids = {
+            challenge_id
+            for challenge_id in eligible_ids
+            if challenge_id in CHALLENGES
+        }
+
+    challenge_ids = [
+        challenge_id
+        for challenge_id in CHALLENGES.keys()
+        if (
+            challenge_id in eligible_ids
+            and challenge_id not in excluded_ids
+        )
+    ]
+
+    # If every eligible challenge has already been used, allow a repeat,
+    # but still never choose an impossible challenge.
+    if not challenge_ids:
+        challenge_ids = [
+            challenge_id
+            for challenge_id in CHALLENGES.keys()
+            if challenge_id in eligible_ids
+        ]
+
+    if not challenge_ids:
+        # A real study workout should always have at least one set.
+        # Falling back keeps the function safe for malformed seed data.
+        return get_challenge_definition(DEFAULT_CHALLENGE["id"])
+
+    digest = hashlib.sha256(
+        f"{user_id}:{assignment_id}:{date_key}".encode("utf-8")
+    ).hexdigest()
+    index = int(digest[:12], 16) % len(challenge_ids)
+
+    return get_challenge_definition(challenge_ids[index])
+
+
+def evaluate_challenge(
+    challenge_id: str | None,
+    exercise_results,
+) -> bool:
+    challenge_id = challenge_id or DEFAULT_CHALLENGE["id"]
+
+    completed_sets, total_sets = get_set_counts(exercise_results)
+
+    if total_sets <= 0:
+        return False
+
+    if challenge_id == "complete_70_percent":
+        return completed_sets / total_sets >= 0.70
+
+    if challenge_id == "complete_80_percent":
+        return completed_sets / total_sets >= 0.80
+
+    if challenge_id == "complete_90_percent":
+        return completed_sets / total_sets >= 0.90
+
+    if challenge_id == "perfect_finish":
+        return completed_sets == total_sets
+
+    if challenge_id == "every_exercise":
+        exercises = list(exercise_results or [])
+        return bool(exercises) and all(
+            any(set_result.completed for set_result in exercise.sets)
+            for exercise in exercises
+        )
+
+    if challenge_id == "two_per_exercise":
+        exercises = list(exercise_results or [])
+
+        if not exercises:
+            return False
+
+        for exercise in exercises:
+            sets = list(exercise.sets or [])
+
+            # The wording says TWO sets from every exercise. If an exercise
+            # has fewer than two sets, this challenge is impossible and must
+            # not count as completed. Assignment selection filters it out.
+            if len(sets) < 2:
+                return False
+
+            completed = sum(
+                1 for set_result in sets
+                if set_result.completed
+            )
+
+            if completed < 2:
+                return False
+
+        return True
+
+    return completed_sets / total_sets >= 0.80
 
 
 # ============================================================
@@ -230,6 +432,7 @@ def process_gamified_workout(
     user_id: str,
     current_stats: dict[str, Any] | None,
     exercise_results,
+    challenge_id: str | None = None,
 ) -> dict[str, Any]:
 
     if not current_stats:
@@ -258,8 +461,17 @@ def process_gamified_workout(
         == total_sets
     )
 
+    challenge_definition = (
+        get_challenge_definition(
+            challenge_id
+        )
+    )
+
     challenge_completed = (
-        performance_score >= 80
+        evaluate_challenge(
+            challenge_definition["id"],
+            exercise_results,
+        )
     )
 
 
@@ -277,7 +489,12 @@ def process_gamified_workout(
     )
 
     challenge_xp = (
-        CHALLENGE_COMPLETION_XP
+        int(
+            challenge_definition.get(
+                "xpReward",
+                CHALLENGE_COMPLETION_XP,
+            )
+        )
         if challenge_completed
         else 0
     )
@@ -489,7 +706,7 @@ def process_gamified_workout(
             perfect_workout,
 
         "challenge": {
-            **DEFAULT_CHALLENGE,
+            **challenge_definition,
 
             "completed":
                 challenge_completed,

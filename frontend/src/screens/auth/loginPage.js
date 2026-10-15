@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 
-import { loginUser } from '../../services/auth';
+import {loginUser, logoutUser} from '../../services/auth';
 
-import { getProfile } from '../../services/profile';
+import {getProfile, saveProfile} from '../../services/profile';
 
 import { COLORS } from '../../constants/theme';
 
@@ -54,18 +54,64 @@ export default function LoginScreen({ navigation }) {
     try {
       await loginUser(username, password);
 
-      const profile = await getProfile();
+      let profile;
+
+      try {
+        profile = await getProfile();
+      } catch (profileError) {
+        if (profileError?.response?.status !== 404) {
+          throw profileError;
+        }
+
+        const participantId =
+          '#FIT-' + Math.floor(10000 + Math.random() * 90000);
+
+        profile = await saveProfile({
+          username: username.trim(),
+          participantId,
+        });
+      }
+
+      if (profile.studyStatus === 'ineligible') {
+        Alert.alert(
+          'Unable to participate',
+          'Your saved health screening indicates that you are not eligible to participate in this study.',
+          [
+            {
+              text: 'Return to welcome',
+              onPress: async () => {
+                try {
+                  await logoutUser();
+                } catch (logoutError) {
+                  console.error('Failed to sign out ineligible user:', logoutError);
+                  navigation.reset({
+                    index: 0,
+                    routes: [{name: 'Welcome'}],
+                  });
+                }
+              },
+            },
+          ],
+          {cancelable: false},
+        );
+        return;
+      }
+
+      if (!profile.screeningCompleted || !profile.screeningPassed) {
+        navigation.reset({
+          index: 0,
+          routes: [{name: 'Onboarding'}],
+        });
+        return;
+      }
 
       navigation.reset({
         index: 0,
-
         routes: [
           {
             name: 'MainTabs',
-
             params: {
               participantId: profile.studyId,
-
               username: profile.name,
             },
           },

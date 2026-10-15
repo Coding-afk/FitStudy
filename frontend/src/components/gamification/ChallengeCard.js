@@ -1,25 +1,94 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { COLORS } from '../../constants/theme';
+import {StyleSheet, Text, View} from 'react-native';
 
-const TARGET_SCORE = 80;
+import {COLORS} from '../../constants/theme';
 
-function ChallengeCard({ performanceScore = 0 }) {
-  const challengeComplete = performanceScore >= TARGET_SCORE;
+const FALLBACK_CHALLENGE = {
+  id: 'complete_80_percent',
+  name: '80% Finisher',
+  description: 'Complete at least 80% of the workout sets.',
+  xpReward: 50,
+};
+
+const isChallengeComplete = ({
+  challenge,
+  completedSets,
+  totalSets,
+  exerciseList,
+}) => {
+  if (!totalSets) {
+    return false;
+  }
+
+  switch (challenge.id) {
+    case 'complete_70_percent':
+      return completedSets / totalSets >= 0.7;
+
+    case 'complete_80_percent':
+      return completedSets / totalSets >= 0.8;
+
+    case 'complete_90_percent':
+      return completedSets / totalSets >= 0.9;
+
+    case 'perfect_finish':
+      return completedSets === totalSets;
+
+    case 'every_exercise':
+      return (
+        exerciseList.length > 0 &&
+        exerciseList.every(exercise =>
+          (exercise.sets ?? []).some(set => set.completed),
+        )
+      );
+
+    case 'two_per_exercise':
+      return (
+        exerciseList.length > 0 &&
+        exerciseList.every(exercise => {
+          const sets = exercise.sets ?? [];
+          const required = Math.min(2, sets.length);
+          const completed = sets.filter(set => set.completed).length;
+
+          return required > 0 && completed >= required;
+        })
+      );
+
+    default:
+      return completedSets / totalSets >= 0.8;
+  }
+};
+
+function ChallengeCard({
+  challenge: suppliedChallenge,
+  completedSets = 0,
+  totalSets = 0,
+  exerciseList = [],
+}) {
+  const challenge = suppliedChallenge ?? FALLBACK_CHALLENGE;
+
+  const challengeComplete = isChallengeComplete({
+    challenge,
+    completedSets,
+    totalSets,
+    exerciseList,
+  });
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Today's Challenge</Text>
+        <View style={styles.titleArea}>
+          <Text style={styles.eyebrow}>TODAY'S CHALLENGE</Text>
+          <Text style={styles.title}>{challenge.name}</Text>
+        </View>
 
         <Text style={[styles.status, challengeComplete && styles.completed]}>
-          {challengeComplete ? 'Completed!' : '+50 XP'}
+          {challengeComplete
+            ? 'Completed!'
+            : `+${challenge.xpReward ?? 50} XP`}
         </Text>
       </View>
 
-      <Text style={styles.description}>
-        Complete at least 80% of today's workout sets.
-      </Text>
+      <Text style={styles.description}>{challenge.description}</Text>
     </View>
   );
 }
@@ -31,39 +100,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     marginLeft: 16,
     justifyContent: 'center',
   },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 7,
   },
-
+  titleArea: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  eyebrow: {
+    color: COLORS.textSecondary,
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
   title: {
     color: COLORS.text,
-    fontSize: 16,
-    fontWeight: 'bold',
-    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
   },
-
   status: {
     color: COLORS.primaryLight,
-    fontWeight: 'bold',
-    fontSize: 13,
+    fontWeight: '700',
+    fontSize: 11,
   },
-
   completed: {
     color: COLORS.success,
   },
-
   description: {
     color: COLORS.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });
 

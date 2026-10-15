@@ -65,10 +65,14 @@ function GamifiedWorkoutRoute({
   const participantId =
     route.params?.participantId ?? null;
 
+  const challenge =
+    route.params?.challenge ?? null;
+
   return (
     <GamifiedWorkoutScreen
       assignmentId={assignmentId}
       workoutId={workoutId}
+      challenge={challenge}
       onCompleteWorkout={summary => {
         navigation.replace(
           'GamifiedSummary',
@@ -167,10 +171,10 @@ function PerfectWorkoutRoute({
   );
 }
 
-function AppNavigator() {
+function AppNavigator({initialRouteName = 'Welcome'}) {
   return (
     <Stack.Navigator
-      initialRouteName={user ? 'MainTabs' : 'Welcome'}
+      initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
         contentStyle: {

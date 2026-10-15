@@ -21,7 +21,7 @@ import { getBadgeDefinition } from '../../constants/badges';
 
 import { COLORS } from '../../constants/theme';
 
-Sound.setCategory('Playback');
+Sound.setCategory('Playback', true);
 
 function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
   const [expanded, setExpanded] = useState(false);
@@ -74,9 +74,15 @@ function GamifiedWorkoutSummaryScreen({ summary, onDone }) {
           return;
         }
 
+        victorySound.setVolume(1.0);
+        victorySound.setCurrentTime(0);
         victorySoundRef.current = victorySound;
 
-        victorySound.play();
+        victorySound.play(success => {
+          if (!success) {
+            console.log('Victory sound playback failed.');
+          }
+        });
       },
     );
 

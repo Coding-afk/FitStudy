@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  ScrollView,
-  Modal,
+  View,
 } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
-import auth from '@react-native-firebase/auth';
-import { COLORS } from '../../constants/theme';
 
-export default function OnboardingScreen({ navigation, route }) {
-  const { participantId } = route.params || {};
+import {logoutUser} from '../../services/auth';
+import {submitHealthScreening} from '../../services/profile';
+import {COLORS} from '../../constants/theme';
 
+export default function OnboardingScreen({navigation}) {
   const [heartCondition, setHeartCondition] = useState(null);
   const [injury, setInjury] = useState(null);
   const [pregnant, setPregnant] = useState(null);
@@ -22,9 +23,11 @@ export default function OnboardingScreen({ navigation, route }) {
   const [ageRange, setAgeRange] = useState(null);
   const [fitnessLevel, setFitnessLevel] = useState(null);
   const [exerciseFrequency, setExerciseFrequency] = useState(null);
-  const [showWarning, setShowWarning] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+
   const [loading, setLoading] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+  const [outcome, setOutcome] = useState(null);
+  const [serverMessage, setServerMessage] = useState('');
 
   const allAnswered =
     heartCondition !== null &&
@@ -36,75 +39,139 @@ export default function OnboardingScreen({ navigation, route }) {
     fitnessLevel !== null &&
     exerciseFrequency !== null;
 
-  const saveToFirestore = async () => {
+  const getScreeningData = () => ({
+    heartCondition,
+    injury,
+    pregnant,
+    asthma,
+    medication,
+    ageRange,
+    fitnessLevel,
+    exerciseFrequency,
+  });
+
+  const goToHome = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{name: 'MainTabs'}],
+    });
+  };
+
+  const submitScreening = async warningAcknowledged => {
+    if (!allAnswered) {
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const user = auth().currentUser;
-      await firestore()
-        .collection('onboarding')
-        .doc(user.uid)
-        .set({
-          participantId,
-          heartCondition,
-          injury,
-          pregnant,
-          asthma,
-          medication,
-          ageRange,
-          fitnessLevel,
-          exerciseFrequency,
-          completedAt: firestore.FieldValue.serverTimestamp(),
-        });
-      navigation.navigate('MainTabs', { participantId });
+      const result = await submitHealthScreening(
+        getScreeningData(),
+        warningAcknowledged,
+      );
+
+      if (result.outcome === 'eligible') {
+        setShowWarning(false);
+        goToHome();
+        return;
+      }
+
+      setOutcome(result.outcome);
+      setServerMessage(result.message || '');
+      setShowWarning(true);
     } catch (error) {
-      console.error('Error saving onboarding:', error);
+      console.error('Health screening failed:', error);
+
+      Alert.alert(
+        'Unable to submit screening',
+        error?.response?.data?.detail ||
+          error?.message ||
+          'Please try again.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleContinue = () => {
-    if (heartCondition === 'yes' || medication === 'yes') {
-      setBlocked(true);
-      setShowWarning(true);
-      return;
-    }
-    if (injury === 'yes' || pregnant === 'yes' || asthma === 'yes') {
-      setBlocked(false);
-      setShowWarning(true);
-      return;
-    }
-    saveToFirestore();
+    submitScreening(false);
   };
 
-  const ToggleQuestion = ({ question, value, onChange }) => (
+  const handleWarningContinue = () => {
+    submitScreening(true);
+  };
+
+  const handleBlockedReturn = async () => {
+    setShowWarning(false);
+    setLoading(true);
+
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error('Failed to sign out blocked participant:', error);
+    } finally {
+      // Always leave the screening screen. Previously this reset only
+      // happened when logout failed, so a successful logout could leave
+      // the participant visually stuck on Health Screening.
+      navigation.reset({
+        index: 0,
+        routes: [{name: 'Welcome'}],
+      });
+
+      setLoading(false);
+    }
+  };
+
+  const ToggleQuestion = ({question, value, onChange}) => (
     <View style={styles.questionRow}>
       <Text style={styles.questionText}>{question}</Text>
+
       <View style={styles.toggleRow}>
         <TouchableOpacity
           style={[styles.toggleBtn, value === 'yes' && styles.toggleActive]}
           onPress={() => onChange('yes')}>
-          <Text style={[styles.toggleText, value === 'yes' && styles.toggleTextActive]}>Yes</Text>
+          <Text
+            style={[
+              styles.toggleText,
+              value === 'yes' && styles.toggleTextActive,
+            ]}>
+            Yes
+          </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.toggleBtn, value === 'no' && styles.toggleActive]}
           onPress={() => onChange('no')}>
-          <Text style={[styles.toggleText, value === 'no' && styles.toggleTextActive]}>No</Text>
+          <Text
+            style={[
+              styles.toggleText,
+              value === 'no' && styles.toggleTextActive,
+            ]}>
+            No
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  const OptionQuestion = ({ question, options, value, onChange }) => (
+  const OptionQuestion = ({question, options, value, onChange}) => (
     <View style={styles.optionSection}>
       <Text style={styles.questionText}>{question}</Text>
+
       <View style={styles.optionRow}>
         {options.map(option => (
           <TouchableOpacity
             key={option}
-            style={[styles.optionBtn, value === option && styles.optionBtnActive]}
+            style={[
+              styles.optionBtn,
+              value === option && styles.optionBtnActive,
+            ]}
             onPress={() => onChange(option)}>
-            <Text style={[styles.optionText, value === option && styles.optionTextActive]}>
+            <Text
+              style={[
+                styles.optionText,
+                value === option && styles.optionTextActive,
+              ]}>
               {option}
             </Text>
           </TouchableOpacity>
@@ -115,40 +182,51 @@ export default function OnboardingScreen({ navigation, route }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <View style={styles.header}>
         <Text style={styles.title}>Health Screening</Text>
+
         <Text style={styles.subtitle}>
-          Please answer all questions honestly. Your answers are stored anonymously and used only for research purposes.
+          Please answer all questions honestly. Your screening is saved against
+          your anonymous participant account and is used to determine study
+          eligibility.
         </Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardLabel}>Health conditions</Text>
+
         <ToggleQuestion
           question="Do you have any heart conditions?"
           value={heartCondition}
           onChange={setHeartCondition}
         />
+
         <View style={styles.divider} />
+
         <ToggleQuestion
-          question="Any joint or muscle injuries?"
+          question="Do you currently have an injury that may affect exercise?"
           value={injury}
           onChange={setInjury}
         />
+
         <View style={styles.divider} />
+
         <ToggleQuestion
-          question="Pregnant or postpartum?"
+          question="Are you currently pregnant?"
           value={pregnant}
           onChange={setPregnant}
         />
+
         <View style={styles.divider} />
+
         <ToggleQuestion
-          question="Do you have any breathing conditions such as asthma?"
+          question="Do you have asthma or another breathing condition?"
           value={asthma}
           onChange={setAsthma}
         />
+
         <View style={styles.divider} />
+
         <ToggleQuestion
           question="Are you currently on medication that affects physical activity?"
           value={medication}
@@ -158,20 +236,25 @@ export default function OnboardingScreen({ navigation, route }) {
 
       <View style={styles.card}>
         <Text style={styles.cardLabel}>About you</Text>
+
         <OptionQuestion
           question="What is your age range?"
           options={['18-24', '25-34', '35-44', '45+']}
           value={ageRange}
           onChange={setAgeRange}
         />
+
         <View style={styles.divider} />
+
         <OptionQuestion
           question="What is your fitness level?"
           options={['Beginner', 'Intermediate', 'Advanced']}
           value={fitnessLevel}
           onChange={setFitnessLevel}
         />
+
         <View style={styles.divider} />
+
         <OptionQuestion
           question="How often do you currently exercise?"
           options={['Never', '1-2x/week', '3-4x/week', '5+/week']}
@@ -182,56 +265,78 @@ export default function OnboardingScreen({ navigation, route }) {
 
       <View style={styles.warningCard}>
         <Text style={styles.warningText}>
-          ⚠️ You may stop or withdraw at any time during any workout without penalty.
+          ⚠️ You may stop or withdraw at any time during any workout without
+          penalty.
         </Text>
       </View>
 
       <TouchableOpacity
-        style={[styles.btn, !allAnswered && styles.btnDisabled]}
+        style={[styles.btn, (!allAnswered || loading) && styles.btnDisabled]}
         disabled={!allAnswered || loading}
         onPress={handleContinue}>
-        <Text style={styles.btnText}>
-          {loading ? 'Saving...' : 'Agree and continue'}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color={COLORS.text} />
+        ) : (
+          <Text style={styles.btnText}>Agree and continue</Text>
+        )}
       </TouchableOpacity>
 
-      <Text style={styles.footerText}>Your data is anonymous and never shared.</Text>
+      <Text style={styles.footerText}>
+        Your screening is linked only to your anonymous participant account.
+      </Text>
 
-      <Modal visible={showWarning} transparent animationType="fade">
+      <Modal
+        visible={showWarning}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (outcome !== 'blocked') {
+            setShowWarning(false);
+          }
+        }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            {blocked ? (
+            {outcome === 'blocked' ? (
               <>
                 <Text style={styles.modalTitle}>Unable to participate</Text>
+
                 <Text style={styles.modalText}>
-                  Based on your health screening answers, we are unable to include you in this study for your safety. This study involves physical activity that may not be suitable for your current health condition.
+                  {serverMessage ||
+                    'Based on your health screening answers, we are unable to include you in this study for your safety.'}
                 </Text>
+
                 <TouchableOpacity
                   style={styles.modalBtnDanger}
-                  onPress={() => {
-                    setShowWarning(false);
-                    navigation.navigate('Welcome');
-                  }}>
-                  <Text style={styles.modalBtnText}>Return to home</Text>
+                  onPress={handleBlockedReturn}>
+                  <Text style={styles.modalBtnText}>Return to welcome</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <Text style={styles.modalTitle}>Please note</Text>
+
                 <Text style={styles.modalText}>
-                  Based on your answers, you may have a condition that requires extra care during physical activity. You may still participate but please listen to your body and stop immediately if you feel unwell. You can withdraw at any time.
+                  {serverMessage ||
+                    'One or more of your answers may require extra care during physical activity. You may continue after acknowledging this warning.'}
                 </Text>
+
                 <TouchableOpacity
                   style={styles.modalBtn}
-                  onPress={() => {
-                    setShowWarning(false);
-                    saveToFirestore();
-                  }}>
-                  <Text style={styles.modalBtnText}>I understand, continue</Text>
+                  onPress={handleWarningContinue}
+                  disabled={loading}>
+                  {loading ? (
+                    <ActivityIndicator color={COLORS.text} />
+                  ) : (
+                    <Text style={styles.modalBtnText}>
+                      I understand, continue
+                    </Text>
+                  )}
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.modalBtnOutline}
-                  onPress={() => setShowWarning(false)}>
+                  onPress={() => setShowWarning(false)}
+                  disabled={loading}>
                   <Text style={styles.modalBtnOutlineText}>Go back</Text>
                 </TouchableOpacity>
               </>
@@ -239,7 +344,6 @@ export default function OnboardingScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
-
     </ScrollView>
   );
 }

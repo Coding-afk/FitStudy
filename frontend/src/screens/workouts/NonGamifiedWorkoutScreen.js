@@ -14,7 +14,11 @@ import ExerciseCard from '../../components/workouts/ExerciseCard';
 
 import WorkoutHeader from '../../components/workouts/WorkoutHeader';
 
-import { getWorkout, saveWorkoutResult } from '../../services/workouts';
+import {
+  discardAssignment,
+  getWorkout,
+  saveWorkoutResult,
+} from '../../services/workouts';
 
 import { COLORS } from '../../constants/theme';
 
@@ -77,6 +81,8 @@ function NonGamifiedWorkoutScreen({
   const [startedAt, setStartedAt] = useState(null);
 
   const [saving, setSaving] = useState(false);
+
+  const [discarding, setDiscarding] = useState(false);
 
   const loadWorkout = useCallback(async () => {
     try {
@@ -302,10 +308,34 @@ function NonGamifiedWorkoutScreen({
     );
   };
 
+  const discardAndExitWorkout = async () => {
+    if (discarding || saving) {
+      return;
+    }
+
+    if (!assignmentId) {
+      setSaveError('Unable to discard this workout because the assignment ID is missing.');
+      return;
+    }
+
+    try {
+      setDiscarding(true);
+      setSaveError('');
+
+      await discardAssignment(assignmentId);
+
+      onDiscardWorkout();
+    } catch (error) {
+      setSaveError(getApiErrorMessage(error));
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   const handleDiscardWorkout = () => {
     Alert.alert(
       'Discard Workout',
-      'Are you sure you want to discard this workout? Your current workout progress will not be saved.',
+      'Are you sure you want to discard this workout? Your current progress will be cleared and the workout will return to Ready status.',
       [
         {
           text: 'Cancel',
@@ -315,8 +345,7 @@ function NonGamifiedWorkoutScreen({
         {
           text: 'Discard',
           style: 'destructive',
-
-          onPress: onDiscardWorkout,
+          onPress: discardAndExitWorkout,
         },
       ],
     );
@@ -402,10 +431,12 @@ function NonGamifiedWorkoutScreen({
 
         <Pressable
           style={styles.discardWorkoutButton}
-          disabled={saving}
+          disabled={saving || discarding}
           onPress={handleDiscardWorkout}
         >
-          <Text style={styles.discardWorkoutText}>Discard Workout</Text>
+          <Text style={styles.discardWorkoutText}>
+            {discarding ? 'Discarding...' : 'Discard Workout'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

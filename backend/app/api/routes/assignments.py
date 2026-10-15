@@ -1,4 +1,5 @@
 import random
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -25,6 +26,11 @@ from app.models.assignment import (
 
 from app.services.assignment_logic import (
     get_next_incomplete_assignment,
+)
+from app.services.gamification import (
+    get_challenge_definition,
+    get_eligible_challenge_ids,
+    select_daily_challenge,
 )
 
 
@@ -91,6 +97,16 @@ def get_user_assignments(
             )
             or document.id
         )
+
+        if (
+            data.get("condition") == "gamified"
+            and data.get("challengeId")
+        ):
+            data["challenge"] = (
+                get_challenge_definition(
+                    data.get("challengeId")
+                )
+            )
 
         assignments.append(
             data
@@ -544,6 +560,17 @@ def start_assignment(
         )
     )
 
+    if current_status == "survey_pending":
+        raise HTTPException(
+            status_code=
+                status.HTTP_409_CONFLICT,
+
+            detail=(
+                "Complete the post-workout survey before starting "
+                "another workout."
+            ),
+        )
+
     if current_status not in (
         "assigned",
         "in_progress",
@@ -557,14 +584,88 @@ def start_assignment(
         )
 
 
+    update_fields = {}
+
     if current_status == "assigned":
-        assignment_ref.update({
+        update_fields.update({
             "status":
                 "in_progress",
 
             "startedAt":
                 firestore.SERVER_TIMESTAMP,
         })
+
+    # Assign only a challenge that is possible for the actual workout.
+    # The challenge is then stored on the assignment so it stays stable
+    # across app restarts and workout discards.
+    if assignment.get("condition") == "gamified":
+        workout_document = (
+            db.collection("workouts")
+            .document(assignment.get("workoutId"))
+            .get()
+        )
+
+        if not workout_document.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assigned workout definition was not found.",
+            )
+
+        workout_data = workout_document.to_dict() or {}
+        eligible_challenge_ids = get_eligible_challenge_ids(
+            workout_data
+        )
+
+        if not eligible_challenge_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This workout has no valid exercise sets for a "
+                    "gamification challenge."
+                ),
+            )
+
+        current_challenge_id = assignment.get("challengeId")
+        challenge_is_valid = (
+            current_challenge_id in eligible_challenge_ids
+        )
+
+        # This also repairs older assignments that may already contain an
+        # impossible challenge from before feasibility filtering existed.
+        if not challenge_is_valid:
+            date_key = (
+                datetime.now(timezone.utc)
+                .date()
+                .isoformat()
+            )
+
+            used_challenge_ids = {
+                item.get("challengeId")
+                for item in assignments
+                if (
+                    item.get("condition") == "gamified"
+                    and item.get("challengeId")
+                    and item.get("assignmentId") != assignment_id
+                )
+            }
+
+            challenge = select_daily_challenge(
+                user_id=user_id,
+                assignment_id=assignment_id,
+                date_key=date_key,
+                excluded_ids=used_challenge_ids,
+                eligible_ids=eligible_challenge_ids,
+            )
+
+            update_fields.update({
+                "challengeId": challenge["id"],
+                "challengeAssignedDate": date_key,
+            })
+
+    if update_fields:
+        assignment_ref.update(
+            update_fields
+        )
 
 
     updated_document = (
@@ -580,5 +681,96 @@ def start_assignment(
         "assignmentId"
     ] = assignment_id
 
+    if (
+        updated_assignment.get("condition") == "gamified"
+        and updated_assignment.get("challengeId")
+    ):
+        updated_assignment["challenge"] = (
+            get_challenge_definition(
+                updated_assignment.get("challengeId")
+            )
+        )
+
 
     return updated_assignment
+
+@router.post(
+    "/{assignment_id}/discard",
+    response_model=AssignmentResponse,
+)
+def discard_assignment(
+    assignment_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Discard unsaved workout progress and reset the assignment.
+
+    A discard is allowed only before a workout result has been submitted.
+    The gamified challenge is intentionally preserved so participants cannot
+    reroll challenges by repeatedly discarding and restarting a workout.
+    """
+
+    user_id = get_user_id(current_user)
+
+    assignment_ref, assignment = get_assignment_for_user(
+        assignment_id,
+        user_id,
+    )
+
+    current_status = assignment.get("status")
+
+    if current_status == "survey_pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "The workout has already been submitted. Complete the "
+                "post-workout survey instead of discarding it."
+            ),
+        )
+
+    if current_status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A completed assignment cannot be discarded.",
+        )
+
+    result_document = (
+        db.collection("workoutResults")
+        .document(assignment_id)
+        .get()
+    )
+
+    if result_document.exists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "A workout result already exists for this assignment and "
+                "cannot be discarded."
+            ),
+        )
+
+    if current_status == "in_progress":
+        assignment_ref.update({
+            "status": "assigned",
+            "startedAt": None,
+            "lastDiscardedAt": firestore.SERVER_TIMESTAMP,
+        })
+    elif current_status != "assigned":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This assignment is not in a discardable state.",
+        )
+
+    updated_document = assignment_ref.get()
+    updated_assignment = updated_document.to_dict() or {}
+    updated_assignment["assignmentId"] = assignment_id
+
+    if (
+        updated_assignment.get("condition") == "gamified"
+        and updated_assignment.get("challengeId")
+    ):
+        updated_assignment["challenge"] = get_challenge_definition(
+            updated_assignment.get("challengeId")
+        )
+
+    return updated_assignment
+

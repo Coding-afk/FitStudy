@@ -19,3 +19,9 @@ export const saveWorkoutResult = async result => {
 };
 
 
+
+export const discardAssignment = async assignmentId => {
+  const response = await api.post(`/assignments/${assignmentId}/discard`);
+
+  return response.data;
+};

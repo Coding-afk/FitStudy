@@ -157,3 +157,23 @@ def test_unexpected_exercise_is_rejected():
             results,
             make_workout(),
         )
+
+
+def test_survey_pending_assignment_blocks_later_workouts():
+    assignments = [
+        {
+            "assignmentId": "A2",
+            "order": 2,
+            "status": "assigned",
+        },
+        {
+            "assignmentId": "A1",
+            "order": 1,
+            "status": "survey_pending",
+        },
+    ]
+
+    next_assignment = get_next_incomplete_assignment(assignments)
+
+    assert next_assignment["assignmentId"] == "A1"
+    assert next_assignment["status"] == "survey_pending"

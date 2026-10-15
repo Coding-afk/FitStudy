@@ -202,6 +202,8 @@ export default function WorkoutSelectionScreen({ navigation }) {
         workoutId: startedAssignment.workoutId,
 
         condition: startedAssignment.condition,
+
+        challenge: startedAssignment.challenge ?? null,
       });
     } catch (requestError) {
       console.error('Failed to start assignment:', requestError);
@@ -216,6 +218,16 @@ export default function WorkoutSelectionScreen({ navigation }) {
     }
   };
 
+  const handleCompleteSurvey = () => {
+    if (!assignment?.assignmentId) {
+      return;
+    }
+
+    navigation.getParent()?.navigate('PostWorkoutSurvey', {
+      assignmentId: assignment.assignmentId,
+    });
+  };
+
   const visibleCompleted = useMemo(() => {
     if (showAllCompleted) {
       return completedAssignments;
@@ -225,6 +237,8 @@ export default function WorkoutSelectionScreen({ navigation }) {
   }, [completedAssignments, showAllCompleted]);
 
   const remainingHidden = Math.max(completedAssignments.length - 3, 0);
+
+  const surveyPending = assignment?.status === 'survey_pending';
 
   if (loading) {
     return (
@@ -274,7 +288,34 @@ export default function WorkoutSelectionScreen({ navigation }) {
       >
         <Text style={styles.heading}>Your workouts</Text>
 
-        {!allCompleted && assignment && (
+        {!allCompleted && assignment && surveyPending && (
+          <>
+            <Text style={styles.sectionLabel}>Action required</Text>
+
+            <View style={[styles.nextCard, styles.surveyPendingCard]}>
+              <Text style={styles.workoutNumber}>
+                Workout {assignment.order}
+                {' of '}
+                {totalCount}
+              </Text>
+
+              <Text style={styles.nextTitle}>Post-workout survey required</Text>
+
+              <Text style={styles.nextDescription}>
+                Submit your feedback to complete this workout and unlock your next assignment.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={handleCompleteSurvey}
+              >
+                <Text style={styles.startButtonText}>Complete survey</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {!allCompleted && assignment && !surveyPending && (
           <>
             <Text style={styles.sectionLabel}>Up next</Text>
 
@@ -579,6 +620,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
 
     marginBottom: 26,
+  },
+
+  surveyPendingCard: {
+    borderColor: COLORS.primaryLight,
   },
 
   workoutNumber: {

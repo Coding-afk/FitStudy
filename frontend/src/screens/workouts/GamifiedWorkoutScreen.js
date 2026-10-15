@@ -21,7 +21,11 @@ import ChallengeCard from '../../components/gamification/ChallengeCard';
 
 import XpPopup from '../../components/gamification/XpPopup';
 
-import { getWorkout, saveWorkoutResult } from '../../services/workouts';
+import {
+  discardAssignment,
+  getWorkout,
+  saveWorkoutResult,
+} from '../../services/workouts';
 
 import { COLORS } from '../../constants/theme';
 
@@ -68,6 +72,8 @@ function GamifiedWorkoutScreen({
 
   workoutId = 'W001',
 
+  challenge = null,
+
   onCompleteWorkout = () => {},
 
   onDiscardWorkout = () => {},
@@ -83,6 +89,8 @@ function GamifiedWorkoutScreen({
   const [startedAt, setStartedAt] = useState(null);
 
   const [saving, setSaving] = useState(false);
+
+  const [discarding, setDiscarding] = useState(false);
 
   const [xpPopup, setXpPopup] = useState(null);
 
@@ -345,12 +353,34 @@ function GamifiedWorkoutScreen({
     );
   };
 
+  const discardAndExitWorkout = async () => {
+    if (discarding || saving) {
+      return;
+    }
+
+    if (!assignmentId) {
+      setSaveError('Unable to discard this workout because the assignment ID is missing.');
+      return;
+    }
+
+    try {
+      setDiscarding(true);
+      setSaveError('');
+
+      await discardAssignment(assignmentId);
+
+      onDiscardWorkout();
+    } catch (error) {
+      setSaveError(getApiErrorMessage(error));
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   const handleDiscardWorkout = () => {
     Alert.alert(
       'Discard Workout',
-
-      'Are you sure you want to discard this workout? Your current workout progress will not be saved.',
-
+      'Are you sure you want to discard this workout? Your current progress will be cleared and the workout will return to Ready status.',
       [
         {
           text: 'Cancel',
@@ -360,8 +390,7 @@ function GamifiedWorkoutScreen({
         {
           text: 'Discard',
           style: 'destructive',
-
-          onPress: onDiscardWorkout,
+          onPress: discardAndExitWorkout,
         },
       ],
     );
@@ -414,7 +443,12 @@ function GamifiedWorkoutScreen({
         <View style={styles.gamePanel}>
           <ProgressRing progress={progress} />
 
-          <ChallengeCard performanceScore={progress} />
+          <ChallengeCard
+            challenge={challenge}
+            completedSets={completedSets}
+            totalSets={totalSets}
+            exerciseList={workout.exerciseList}
+          />
         </View>
 
         {workout.exerciseList.map(exercise => (
@@ -457,10 +491,12 @@ function GamifiedWorkoutScreen({
 
         <Pressable
           style={styles.discardButton}
-          disabled={saving}
+          disabled={saving || discarding}
           onPress={handleDiscardWorkout}
         >
-          <Text style={styles.discardButtonText}>Discard Workout</Text>
+          <Text style={styles.discardButtonText}>
+            {discarding ? 'Discarding...' : 'Discard Workout'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

@@ -79,9 +79,6 @@ def get_development_user() -> dict:
             "userId":
                 DEV_USER_ID,
 
-            "email":
-                DEV_USER_EMAIL,
-
             "createdAt":
                 firestore.SERVER_TIMESTAMP,
 
