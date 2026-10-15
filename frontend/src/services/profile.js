@@ -11,3 +11,10 @@ export const saveProfile = async profile => {
 
   return response.data;
 };
+
+export const updateUsername = async username => {
+  const response = await api.patch('/profile/username', null, {
+    params: {username}
+  });
+  return response.data
+}

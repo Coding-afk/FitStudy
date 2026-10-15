@@ -196,3 +196,21 @@ def save_profile(
         user_id,
         saved_data,
     )
+@router.patch("/username")
+def update_username( username, user=Depends(get_current_user)):
+    user_id = user.get("uid")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    username = username.strip()
+    if len(username) < 3 or len(username) > 20:
+        raise HTTPException(status_code=400, detail="Username must be between 3 and 30 characters")
+    user_ref = (db.collection("users").document(user_id))
+    if not user_ref.get().exists:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    user_ref.update({
+        "username": username
+    })
+    return {
+        "message": "Username updated successfully.",
+        "username": username
+    }

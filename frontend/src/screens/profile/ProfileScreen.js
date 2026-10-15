@@ -13,6 +13,8 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 
 import {
@@ -21,6 +23,7 @@ import {
 
 import {
   getProfile,
+  updateUsername
 } from '../../services/profile';
 
 import {
@@ -37,6 +40,8 @@ export default function ProfileScreen({
 
   const [profile, setProfile] = useState(user || {});
   const [loading, setLoading] = useState(true);
+  const [newUsername, setNewUsername] = useState('');
+  const [usernameModalVisible, setUsernameModalVisible] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -109,10 +114,35 @@ export default function ProfileScreen({
   };
 
   const handleUsernameReset = () => {
-    Alert.alert(
-      'Reset Username',
-      'An instructions link to update your username has been sent to your registered email.',
-    );
+    setNewUsername('');
+    setUsernameModalVisible(true);
+  };
+
+  const saveUsername = async () => {
+    const username = newUsername?.trim();
+    if (!username || username.length < 3 || username.length > 20) {
+      Alert.alert(
+        'Invalid Username',
+        'Username must be between 3 and 20 characters.',
+      );
+      return;
+    }
+    try {
+      await updateUsername(username);
+      Alert.alert(
+        'Success',
+        'Your username has been updated.',
+      );
+      const updateProfile = await getProfile();
+      setProfile(updateProfile);
+      setUsernameModalVisible(false);
+    } catch (error) {
+      console.error("Username update failed:", error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.detail || 'Could not update username.',
+      );
+    }
   };
 
   const handlePasswordReset = () => {
@@ -154,6 +184,41 @@ export default function ProfileScreen({
       style={styles.container}
       contentContainerStyle={styles.content}
     >
+    <Modal
+      visible={usernameModalVisible}
+      transparent
+      animationType='fade'
+      onRequestClose={() => setUsernameModalVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Reset Username</Text>
+          <TextInput
+            style={styles.input}
+            placeholder='Enter new username'
+            placeholderTextColor={COLORS.textSecondary}
+            value={newUsername}
+            onChangeText={setNewUsername}
+            autoCapitalize='none'
+            maxLength={20}
+          />
+          <View style={styles.modelButtons}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setUsernameModalVisible(false)}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={saveUsername}
+            >
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
       <View style={styles.headerContainer}>
         <Text style={styles.welcomeTitle}>
           Welcome, {userInfo.name}!
@@ -420,5 +485,42 @@ const styles = StyleSheet.create({
 
   logoutText: {
     color: '#FF8080',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor:  'rgba(0,0,0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+
+  modalContent: {
+    width: '100%',
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 20,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    padding: 12,
+    color: COLORS.text,
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 12,
   },
 });
