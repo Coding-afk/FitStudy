@@ -1,3 +1,6 @@
+// Firebase Authentication service. FitStudy presents usernames to participants,
+// then maps them to an internal email-shaped credential required by Firebase Auth.
+
 import {
   createUserWithEmailAndPassword,
   deleteUser,
@@ -11,6 +14,8 @@ import {
 
 import {auth} from '../config/firebase';
 
+// Firebase's Email/Password provider requires an email-shaped identifier.
+// This synthetic value is internal only; participants log in with a username.
 const usernameToEmail = username => {
   return `${username.trim().toLowerCase()}@fitstudy.app`;
 };
@@ -41,6 +46,7 @@ export const deleteRegisteredUser = async user => {
   await deleteUser(user);
 };
 
+// Sensitive changes require the participant to prove their password again.
 export const reauthenticateCurrentUser = async currentPassword => {
   const user = auth.currentUser;
 

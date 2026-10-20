@@ -1,8 +1,12 @@
+"""Pure health-screening decision logic used by the protected screening endpoint."""
+
 from typing import Literal
 
 ScreeningOutcome = Literal['eligible', 'warning', 'blocked']
 
 
+# Keep screening decisions pure/testable. The route persists the returned outcome,
+# while this function only classifies the submitted answers.
 def evaluate_screening(data: dict) -> ScreeningOutcome:
     """Return the study screening outcome for the supplied answers.
 

@@ -1,3 +1,6 @@
+// Health screening and consent flow. The backend evaluates eligibility so a
+// participant cannot bypass warning/blocked rules by changing frontend state alone.
+
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
@@ -57,6 +60,8 @@ export default function OnboardingScreen({navigation}) {
     });
   };
 
+  // Send raw answers to the backend; eligibility/warning/blocked decisions must
+  // be made server-side so they cannot be bypassed by editing the client.
   const submitScreening = async warningAcknowledged => {
     if (!allAnswered) {
       return;
@@ -101,6 +106,8 @@ export default function OnboardingScreen({navigation}) {
     submitScreening(true);
   };
 
+  // Blocked participants are signed out before returning to Welcome so an
+  // authenticated session cannot accidentally continue into the study.
   const handleBlockedReturn = async () => {
     setShowWarning(false);
     setLoading(true);

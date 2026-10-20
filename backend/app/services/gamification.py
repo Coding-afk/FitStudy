@@ -1,3 +1,5 @@
+"""Server-side gamification rules: challenges, XP, levels, badges, and reward calculation."""
+
 import hashlib
 
 from typing import Any
@@ -69,6 +71,8 @@ def get_challenge_definition(
     return dict(challenge)
 
 
+# Filter the challenge pool against the actual workout structure. For example,
+# two_per_exercise is impossible when any exercise contains fewer than two sets.
 def get_eligible_challenge_ids(
     workout_data: dict[str, Any] | None,
 ) -> set[str]:
@@ -110,6 +114,8 @@ def get_eligible_challenge_ids(
     return eligible
 
 
+# Select deterministically enough to persist one challenge per assignment, while
+# preferring challenges the participant has not already seen when possible.
 def select_daily_challenge(
     user_id: str,
     assignment_id: str,
@@ -166,6 +172,8 @@ def select_daily_challenge(
     return get_challenge_definition(challenge_ids[index])
 
 
+# Authoritative challenge validation performed from submitted/canonical set data.
+# The frontend's challenge card is visual feedback only and cannot award XP itself.
 def evaluate_challenge(
     challenge_id: str | None,
     exercise_results,
@@ -368,6 +376,8 @@ def calculate_performance_score(
 # LEVEL CALCULATION
 # ============================================================
 
+# Return progress information for the current level, including a safe terminal
+# state for Champion so callers never divide by a non-existent next level.
 def get_level_details(
     total_xp: int,
 ) -> dict[str, Any]:
@@ -386,6 +396,7 @@ def get_level_details(
 # BADGE CALCULATION
 # ============================================================
 
+# Derive newly earned badge IDs from persisted statistics without trusting the client.
 def calculate_earned_badges(
     total_xp: int,
     level: int,
@@ -428,6 +439,8 @@ def calculate_earned_badges(
 # MAIN GAMIFICATION ENGINE
 # ============================================================
 
+# Main gamification calculation for a validated gamified workout. It computes XP,
+# challenge success, level state, and newly unlocked badges in one server-side step.
 def process_gamified_workout(
     user_id: str,
     current_stats: dict[str, Any] | None,

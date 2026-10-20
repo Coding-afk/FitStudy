@@ -1,3 +1,6 @@
+// Loads the authenticated participant's gamification statistics and presents
+// level progress, XP information, and earned/locked badges in one reusable card.
+
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -25,6 +28,7 @@ function GamificationProfileCard() {
 
   const badges = getAllBadges();
 
+  // Reload stats from the server so the card always reflects awarded XP/badges.
   const loadStats = useCallback(async () => {
     try {
       setLoading(true);

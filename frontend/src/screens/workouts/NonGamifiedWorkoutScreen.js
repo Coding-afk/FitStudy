@@ -1,3 +1,6 @@
+// Active standard workout flow. It uses the same underlying workout structure
+// as gamified sessions while deliberately omitting gamification-specific feedback.
+
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -189,6 +192,7 @@ function NonGamifiedWorkoutScreen({
 
   const allSetsCompleted = totalSets > 0 && completedSets === totalSets;
 
+  // Build the same core result shape used by gamified workouts, minus gamification data.
   const buildSummary = () => {
     if (!workout || !startedAt) {
       return null;
@@ -241,6 +245,8 @@ function NonGamifiedWorkoutScreen({
     };
   };
 
+  // Result submission moves the assignment to survey_pending. The next assignment
+  // stays locked until the post-workout survey is submitted.
   const saveAndCompleteWorkout = async () => {
     if (saving) {
       return;
@@ -308,6 +314,7 @@ function NonGamifiedWorkoutScreen({
     );
   };
 
+  // Discard returns this assignment to assigned so it can be restarted later.
   const discardAndExitWorkout = async () => {
     if (discarding || saving) {
       return;

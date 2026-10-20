@@ -1,3 +1,6 @@
+// Main authenticated tab shell. Only participant-facing destinations that are
+// part of the final study experience are exposed here.
+
 import {StyleSheet, Text} from 'react-native';
 
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';

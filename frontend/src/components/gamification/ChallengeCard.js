@@ -1,3 +1,7 @@
+// Displays the daily challenge assigned to a gamified workout.
+// The local completion check is only for immediate UI feedback; the backend remains
+// the authoritative source that decides whether challenge XP is actually awarded.
+
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 
@@ -10,6 +14,8 @@ const FALLBACK_CHALLENGE = {
   xpReward: 50,
 };
 
+// Mirrors the challenge rule only to show live progress in the card.
+// The backend re-evaluates the same challenge from the submitted workout data.
 const isChallengeComplete = ({
   challenge,
   completedSets,

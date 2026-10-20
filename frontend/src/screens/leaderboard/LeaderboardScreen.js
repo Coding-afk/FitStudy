@@ -1,3 +1,6 @@
+// Participant leaderboard. Rankings and usernames come from the backend so
+// clients cannot locally manipulate leaderboard order or score values.
+
 import React, { useCallback, useState } from 'react';
 
 import {

@@ -1,3 +1,6 @@
+// Final reward completion screen. It distinguishes the first FitStudy Complete
+// award from later replays so the bonus workout never behaves like an 11th study session.
+
 import React from 'react';
 
 import {

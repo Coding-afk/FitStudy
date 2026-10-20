@@ -1,3 +1,6 @@
+// Gamified workout summary. It displays authoritative XP/badge/challenge results
+// returned by the backend before handing the participant to the required survey.
+
 import { useEffect, useRef, useState } from 'react';
 
 import {

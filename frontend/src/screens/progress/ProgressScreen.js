@@ -1,3 +1,7 @@
+// Legacy progress screen retained in the source tree but not exposed in the final
+// participant navigation. Survey motivation/engagement results are intentionally not
+// shown back to participants because that feedback could influence later responses.
+
 import { StyleSheet, Text, View, ScrollView } from 'react-native';
 
 const workoutData = [

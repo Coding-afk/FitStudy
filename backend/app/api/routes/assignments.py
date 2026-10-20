@@ -1,3 +1,5 @@
+"""Assignment generation and progression endpoints for the ten-session study sequence."""
+
 import random
 from datetime import datetime, timezone
 
@@ -68,6 +70,7 @@ def get_user_id(
     return user_id
 
 
+# Read and normalize all assignments for one participant before sequence decisions.
 def get_user_assignments(
     user_id: str,
 ) -> list[dict]:
@@ -181,6 +184,8 @@ def get_assignment_for_user(
     response_model=
         AssignmentListResponse,
 )
+# Create exactly ten study assignments: W001-W005 once per condition, then shuffle
+# their sequence while preserving a unique order value from 1 through 10.
 def generate_assignments(
     current_user: dict = Depends(
         get_current_user
@@ -407,6 +412,8 @@ def get_my_assignments(
     response_model=
         NextAssignmentResponse,
 )
+# Return the first incomplete assignment. A survey_pending assignment remains the
+# next required action and therefore blocks progression to a later workout.
 def get_next_assignment(
     current_user: dict = Depends(
         get_current_user
@@ -474,6 +481,8 @@ def get_next_assignment(
     response_model=
         AssignmentResponse,
 )
+# Enforce ownership and sequence order before moving an assignment to in_progress.
+# Gamified assignments also receive/preserve one feasible daily challenge here.
 def start_assignment(
     assignment_id: str,
 
@@ -698,6 +707,8 @@ def start_assignment(
     "/{assignment_id}/discard",
     response_model=AssignmentResponse,
 )
+# Reset an unfinished workout to assigned so it can be restarted. Challenge fields
+# are intentionally preserved to prevent challenge rerolling through repeated discards.
 def discard_assignment(
     assignment_id: str,
     current_user: dict = Depends(get_current_user),

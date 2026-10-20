@@ -1,3 +1,6 @@
+// Assignment API wrapper. Keeping endpoint calls here prevents screens from
+// duplicating URLs and keeps assignment-generation/progression logic backend-owned.
+
 import api from './api';
 
 export const generateAssignments = async () => {

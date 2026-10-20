@@ -1,3 +1,5 @@
+"""Participant profile, screening, username, and secure account-deletion endpoints."""
+
 import re
 import time
 
@@ -23,6 +25,7 @@ router = APIRouter(
 )
 
 
+# Translate Firestore field names into the compact participant-facing profile model.
 def build_profile(user_id: str, data: dict) -> UserProfile:
     # Backward compatibility: earlier builds used onboardingCompleted rather
     # than screeningCompleted/screeningPassed. A user who already completed
@@ -111,6 +114,8 @@ def save_profile(
 
 
 @router.post('/screening', response_model=ScreeningResponse)
+# Persist both detailed screening answers and the summarized eligibility flags used
+# by app startup/login to decide whether the participant may enter the study.
 def submit_screening(
     screening: ScreeningSubmission,
     user=Depends(get_current_user),
@@ -266,6 +271,164 @@ def submit_screening(
     )
 
 
+
+# ============================================================
+# ACCOUNT DELETION
+# ============================================================
+
+_ACCOUNT_DELETE_REAUTH_WINDOW_SECONDS = 300
+_DELETE_BATCH_SIZE = 400
+
+
+# Account deletion is destructive, so require a freshly issued token whose auth_time
+# proves that the participant recently re-entered their password in the app.
+def _require_recent_reauthentication(user: dict) -> None:
+    """Require a recently refreshed Firebase token for destructive actions.
+
+    The frontend re-authenticates with the participant's current password and
+    then forces a fresh ID token. Firebase includes that sign-in time as
+    ``auth_time`` in the verified token used by this backend.
+    """
+
+    if user.get('devBypass'):
+        return
+
+    auth_time = int(user.get('auth_time', 0) or 0)
+
+    if (
+        auth_time <= 0
+        or time.time() - auth_time > _ACCOUNT_DELETE_REAUTH_WINDOW_SECONDS
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail='Please confirm your current password before deleting your account.',
+        )
+
+
+# Gather only documents owned by this participant. Shared workout definitions are
+# deliberately excluded so account deletion cannot damage data used by other users.
+def _collect_participant_document_refs(user_id: str):
+    """Return only Firestore documents owned by this participant.
+
+    Shared workout definitions are intentionally excluded. The extra userId
+    queries also catch older records whose document IDs may not follow the
+    current assignment-based naming convention.
+    """
+
+    refs = [
+        db.collection('users').document(user_id),
+        db.collection('onboarding').document(user_id),
+        db.collection('gamificationStats').document(user_id),
+    ]
+
+    # Assignments are queried first because current workout results and survey
+    # responses use assignmentId as their Firestore document ID.
+    assignment_documents = list(
+        db.collection('workoutAssignments')
+        .where('userId', '==', user_id)
+        .stream()
+    )
+
+    for assignment_document in assignment_documents:
+        assignment_id = assignment_document.id
+        refs.append(assignment_document.reference)
+        refs.append(db.collection('workoutResults').document(assignment_id))
+        refs.append(db.collection('survey_responses').document(assignment_id))
+
+        # Older project builds used surveyResponses without the underscore.
+        # Deleting the legacy path is harmless when no such document exists.
+        refs.append(db.collection('surveyResponses').document(assignment_id))
+
+    # These queries provide migration-safe cleanup if an old document has the
+    # correct userId but a non-standard document ID.
+    for collection_name in (
+        'workoutResults',
+        'survey_responses',
+        'surveyResponses',
+        'rewardCompletions',
+    ):
+        documents = (
+            db.collection(collection_name)
+            .where('userId', '==', user_id)
+            .stream()
+        )
+        refs.extend(document.reference for document in documents)
+
+    # De-duplicate references because current records may be found both by
+    # assignment ID and by the userId query above.
+    unique_refs = {}
+    for ref in refs:
+        unique_refs[ref.path] = ref
+
+    return list(unique_refs.values())
+
+
+# Firestore batches have a write limit, so delete participant documents in chunks.
+def _delete_document_refs(document_refs) -> int:
+    """Delete Firestore references in safe batches below Firestore's limit."""
+
+    deleted_count = 0
+
+    for start in range(0, len(document_refs), _DELETE_BATCH_SIZE):
+        batch = db.batch()
+        batch_refs = document_refs[start:start + _DELETE_BATCH_SIZE]
+
+        for document_ref in batch_refs:
+            batch.delete(document_ref)
+
+        batch.commit()
+        deleted_count += len(batch_refs)
+
+    return deleted_count
+
+
+@router.delete('')
+# Full CRUD delete operation: remove participant-owned Firestore data first, then
+# delete the Firebase Auth account so the same credentials can no longer sign in.
+def delete_account(user=Depends(get_current_user)):
+    """Permanently delete the authenticated participant and owned study data."""
+
+    user_id = user.get('uid')
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail='User not authenticated')
+
+    _require_recent_reauthentication(user)
+
+    try:
+        document_refs = _collect_participant_document_refs(user_id)
+        _delete_document_refs(document_refs)
+    except Exception as error:
+        print('ACCOUNT DATA DELETION ERROR:', error)
+        raise HTTPException(
+            status_code=500,
+            detail='Unable to delete participant data. Please try again.',
+        ) from error
+
+    # Firebase Auth is deleted last. If this step fails, the user can still
+    # authenticate and retry the deletion instead of being locked out while
+    # Firestore cleanup remains incomplete.
+    if not user.get('devBypass'):
+        try:
+            firebase_auth.delete_user(user_id)
+        except firebase_auth.UserNotFoundError:
+            # Treat an already-missing Auth user as successfully deleted.
+            pass
+        except Exception as error:
+            print('AUTH ACCOUNT DELETION ERROR:', error)
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    'Participant data was removed, but the authentication '
+                    'account could not be deleted. Please try Delete Account again.'
+                ),
+            ) from error
+
+    return {
+        'message': 'Account and participant data deleted successfully.',
+    }
+
+
 # ============================================================
 # USERNAME CHANGE
 # ============================================================
@@ -274,6 +437,7 @@ _USERNAME_PATTERN = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 _USERNAME_REAUTH_WINDOW_SECONDS = 300
 
 
+# Username changes also update the hidden Firebase email-shaped login identifier.
 def _synthetic_email(username: str) -> str:
     return f"{username.strip().lower()}@fitstudy.app"
 

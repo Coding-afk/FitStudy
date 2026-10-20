@@ -1,9 +1,13 @@
+"""Firebase Admin initialization and shared Firestore client."""
+
 from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 
+# Resolve credentials relative to the backend folder rather than the current
+# terminal working directory, which makes local startup more predictable.
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 SERVICE_ACCOUNT_PATH = (

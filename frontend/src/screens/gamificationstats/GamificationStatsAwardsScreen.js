@@ -1,3 +1,6 @@
+// Detailed participant gamification/awards screen. Values are read from the
+// backend source of truth rather than recalculated independently on the client.
+
 
 
 import React from 'react';

@@ -1,3 +1,5 @@
+"""Pure helper logic for choosing the next incomplete assignment in sequence."""
+
 def get_next_incomplete_assignment(assignments: list[dict]) -> dict | None:
     """Return the lowest-order assignment that is not completed."""
 

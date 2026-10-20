@@ -1,3 +1,6 @@
+// Authenticated Home screen. It coordinates the next assignment, completed
+// history, required pending survey, study progress, and Perfect Workout reward state.
+
 import React, { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -84,6 +87,8 @@ export default function WorkoutSelectionScreen({ navigation }) {
     setCompletedAssignments(withDetails);
   }, []);
 
+  // Build the complete Home state from assignments/reward endpoints in one refresh.
+  // A survey_pending assignment takes priority and blocks the next workout.
   const loadHome = useCallback(
     async (showLoading = true) => {
       try {
@@ -181,6 +186,8 @@ export default function WorkoutSelectionScreen({ navigation }) {
     setRefreshing(false);
   }, [loadHome]);
 
+  // Starting is validated by the backend, which enforces assignment order and
+  // returns the persisted daily challenge for gamified sessions.
   const handleStartWorkout = async () => {
     if (!assignment) {
       return;
@@ -218,6 +225,7 @@ export default function WorkoutSelectionScreen({ navigation }) {
     }
   };
 
+  // Resume the required survey instead of allowing progression to a later assignment.
   const handleCompleteSurvey = () => {
     if (!assignment?.assignmentId) {
       return;

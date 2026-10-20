@@ -1,3 +1,6 @@
+// Active gamified workout flow. It tracks editable set results locally, displays
+// the assigned challenge/XP feedback, saves one validated result, then requires survey.
+
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -95,6 +98,8 @@ function GamifiedWorkoutScreen({
   const [xpPopup, setXpPopup] = useState(null);
 
 
+  // Fetch both assignment/workout data before allowing result editing. The challenge
+  // is persisted on the assignment so leaving/reopening cannot reroll it.
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -226,6 +231,8 @@ function GamifiedWorkoutScreen({
 
   const allSetsCompleted = totalSets > 0 && completedSets === totalSets;
 
+  // Convert the editable UI state into the canonical result/summary shape expected
+  // by the backend and the summary screen.
   const buildSummary = () => {
     if (!workout || !startedAt) {
       return null;
@@ -278,6 +285,8 @@ function GamifiedWorkoutScreen({
     };
   };
 
+  // Save exactly one workout result. The backend awards gamification and moves the
+  // assignment to survey_pending; study counters wait for survey submission.
   const saveAndCompleteWorkout = async () => {
     if (saving) {
       return;
@@ -353,6 +362,8 @@ function GamifiedWorkoutScreen({
     );
   };
 
+  // Discard resets the assignment to assigned but deliberately keeps its challenge
+  // so a participant cannot reroll challenges by repeatedly discarding.
   const discardAndExitWorkout = async () => {
     if (discarding || saving) {
       return;

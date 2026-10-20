@@ -1,3 +1,6 @@
+// Profile API wrapper for participant profile, screening, username, and account deletion.
+// Sensitive operations are still authorized and validated by the backend.
+
 import api from './api';
 
 export const getProfile = async () => {
@@ -15,6 +18,14 @@ export const changeUsername = async username => {
     username,
   });
 
+  return response.data;
+};
+
+
+export const deleteAccount = async () => {
+  // Account deletion is performed by the authenticated backend so it can
+  // remove both Firestore study data and the matching Firebase Auth user.
+  const response = await api.delete('/profile');
   return response.data;
 };
 

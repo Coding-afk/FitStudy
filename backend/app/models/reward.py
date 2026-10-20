@@ -1,3 +1,5 @@
+"""Request model for completing the separate Perfect Workout reward."""
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field

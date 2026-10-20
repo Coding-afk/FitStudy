@@ -1,3 +1,6 @@
+// Participant sign-in screen. Usernames are converted internally by the auth
+// service, while this screen owns validation, loading state, and readable errors.
+
 import React, { useState } from 'react';
 
 import {
@@ -42,6 +45,8 @@ export default function LoginScreen({ navigation }) {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Firebase restores the user session after a successful sign-in; navigation then
+  // relies on the authenticated app state rather than storing the password locally.
   const handleLogin = async () => {
     if (!validate()) {
       return;

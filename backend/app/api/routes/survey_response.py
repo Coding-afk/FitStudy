@@ -1,3 +1,5 @@
+"""Post-workout survey endpoint that finalizes a survey-pending assignment transactionally."""
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -65,6 +67,8 @@ def create_survey_response(
 
     transaction = db.transaction()
 
+    # Complete survey + assignment + user study counters atomically. This prevents
+    # a survey document being saved without the assignment progressing (or vice versa).
     @firestore.transactional
     def submit_survey(transaction):
         # All reads must happen before writes in a Firestore transaction.

@@ -1,3 +1,6 @@
+// Account/Profile screen. It displays non-sensitive study information and owns
+// sensitive account actions such as username/password changes, logout, and deletion.
+
 import React, {useCallback, useState} from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +17,11 @@ import {
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 
-import {changeUsername, getProfile} from '../../services/profile';
+import {
+  changeUsername,
+  deleteAccount,
+  getProfile,
+} from '../../services/profile';
 import {
   changePassword,
   logoutUser,
@@ -49,6 +56,14 @@ export default function ProfileScreen({navigation, route}) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Account deletion is deliberately separated from logout. Deleting the
+  // account permanently removes the participant's own study data and Firebase
+  // Authentication account, so it requires password confirmation.
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  // Reload on focus so username/progress changes made elsewhere are reflected here.
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
@@ -100,6 +115,8 @@ export default function ProfileScreen({navigation, route}) {
     setUsernameModalVisible(true);
   };
 
+  // Username is also the hidden Firebase login identifier. After updating it,
+  // sign out so the next session is created cleanly with the new credential.
   const performUsernameChange = async cleanUsername => {
     try {
       setChangingUsername(true);
@@ -205,6 +222,8 @@ export default function ProfileScreen({navigation, route}) {
     setPasswordModalVisible(true);
   };
 
+  // Password changes use Firebase reauthentication and never store the password
+  // in Firestore or send it to the FitStudy backend.
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert('Missing information', 'Please complete all password fields.');
@@ -258,6 +277,92 @@ export default function ProfileScreen({navigation, route}) {
     } finally {
       setChangingPassword(false);
     }
+  };
+
+  const openDeleteModal = () => {
+    setDeletePassword('');
+    setDeleteModalVisible(true);
+  };
+
+  // Reauthenticate first, then let the backend delete participant-owned study data
+  // and the matching Firebase Auth account as one protected account action.
+  const performAccountDeletion = async () => {
+    try {
+      setDeletingAccount(true);
+
+      // Re-authentication proves that the person holding the unlocked phone
+      // knows the current password before a destructive account operation.
+      await reauthenticateCurrentUser(deletePassword);
+
+      // The backend removes only participant-owned records. Shared workout
+      // definitions are intentionally preserved for the rest of the study.
+      await deleteAccount();
+
+      setDeleteModalVisible(false);
+      setDeletePassword('');
+
+      // The backend deletes the Firebase Auth account. signOut() clears the
+      // local Firebase session so App.js immediately returns to the guest flow.
+      try {
+        await logoutUser();
+      } catch (logoutError) {
+        // A deleted Firebase account can invalidate the local session before
+        // signOut finishes. The navigation reset below is still safe.
+        console.warn('Local sign-out after account deletion:', logoutError);
+      }
+
+      navigation.getParent()?.reset({
+        index: 0,
+        routes: [{name: 'Welcome'}],
+      });
+
+      Alert.alert(
+        'Account deleted',
+        'Your FitStudy account and participant data have been permanently deleted.',
+      );
+    } catch (error) {
+      console.error('Account deletion failed:', error);
+
+      const detail = error?.response?.data?.detail;
+
+      if (
+        error?.code === 'auth/invalid-credential' ||
+        error?.code === 'auth/wrong-password'
+      ) {
+        Alert.alert('Incorrect password', 'Your current password is incorrect.');
+      } else {
+        Alert.alert(
+          'Unable to delete account',
+          detail || error?.message || 'Please try again.',
+        );
+      }
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  // Destructive action requires an explicit second confirmation before execution.
+  const handleDeleteAccount = () => {
+    if (!deletePassword) {
+      Alert.alert(
+        'Password required',
+        'Enter your current password before deleting your account.',
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Permanently delete account?',
+      'This cannot be undone. Your profile, health screening, workout assignments, workout results, surveys, gamification data and reward records will be deleted.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: performAccountDeletion,
+        },
+      ],
+    );
   };
 
   const handleLogout = () => {
@@ -361,6 +466,15 @@ export default function ProfileScreen({navigation, route}) {
             onPress={handleLogout}
           >
             <Text style={[styles.buttonText, styles.logoutText]}>Log Out</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.deleteAccountButton]}
+            onPress={openDeleteModal}
+          >
+            <Text style={[styles.buttonText, styles.deleteAccountText]}>
+              Delete Account
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -501,6 +615,65 @@ export default function ProfileScreen({navigation, route}) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deletingAccount) {
+            setDeleteModalVisible(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Delete Account</Text>
+
+            <Text style={styles.deleteWarningTitle}>
+              This action is permanent
+            </Text>
+            <Text style={styles.modalDescription}>
+              Deleting your account removes your participant profile, health
+              screening, assignments, workout results, surveys, gamification
+              data and reward history. Shared FitStudy workout definitions are
+              not affected.
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Current password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              secureTextEntry
+              editable={!deletingAccount}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deletingAccount}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteModalButton]}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color={COLORS.text} />
+                ) : (
+                  <Text style={styles.deleteModalButtonText}>Delete Account</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -620,6 +793,13 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#FF8080',
   },
+  deleteAccountButton: {
+    backgroundColor: '#4A1717',
+    borderColor: '#A43A3A',
+  },
+  deleteAccountText: {
+    color: '#FFB0B0',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -699,5 +879,20 @@ const styles = StyleSheet.create({
   modalSaveButton: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primaryLight,
+  },
+  deleteWarningTitle: {
+    color: '#FF8080',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  deleteModalButton: {
+    backgroundColor: '#6B1F1F',
+    borderColor: '#A43A3A',
+  },
+  deleteModalButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

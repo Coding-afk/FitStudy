@@ -1,3 +1,5 @@
+"""Workout-result endpoint with ownership, duplicate, structure, and gamification validation."""
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -85,6 +87,8 @@ def create_workout_result(
 
     transaction = db.transaction()
 
+    # The transaction keeps result creation, assignment status, and gamification
+    # updates consistent even if two submissions arrive at nearly the same time.
     @firestore.transactional
     def finish_workout(transaction):
         # ====================================================

@@ -1,3 +1,5 @@
+"""Development/seed script that creates the standalone PERFECT001 reward workout."""
+
 from pathlib import Path
 import sys
 
@@ -146,6 +148,8 @@ PERFECT_WORKOUT = {
 }
 
 
+# Idempotently write the reward workout under a fixed ID so assignment generation
+# can never accidentally include it among W001-W005.
 def create_perfect_workout():
     workout_ref = (
         db.collection("workouts")

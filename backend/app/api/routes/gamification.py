@@ -1,3 +1,5 @@
+"""Authenticated gamification statistics and leaderboard endpoints."""
+
 import hashlib
 
 from fastapi import (
@@ -29,6 +31,7 @@ router = APIRouter(
 # LEVEL PROGRESS
 # ============================================================
 
+# Convert raw XP into values the frontend can render safely, including the max level.
 def calculate_level_progress(
     total_xp: int,
 ) -> dict:
@@ -173,6 +176,8 @@ def create_player_alias(
     )
 
 
+# Prefer the current Firestore username; retain the anonymous alias only as a
+# fallback for legacy/incomplete development records.
 def get_leaderboard_name(
     user_id: str,
 ) -> str:
@@ -293,6 +298,7 @@ def get_my_gamification_stats(
 # ============================================================
 
 @router.get("/leaderboard")
+# Build leaderboard rows from server-owned XP data rather than trusting client scores.
 def get_leaderboard(
     limit: int = Query(
         default=25,

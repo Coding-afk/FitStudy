@@ -1,3 +1,5 @@
+"""One-time migration script that removes legacy visible email fields from user documents."""
+
 from pathlib import Path
 import sys
 
@@ -11,6 +13,8 @@ if str(BACKEND_DIR) not in sys.path:
 from app.core.firebase import db
 
 
+# Migration only: Firebase Auth still uses its hidden synthetic identifier, while
+# participant Firestore profiles no longer keep a visible/redundant email field.
 def remove_legacy_user_emails():
     removed = 0
 

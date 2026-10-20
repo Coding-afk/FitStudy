@@ -1,3 +1,6 @@
+// Perfect Workout reward API wrapper. Reward data is kept separate from the ten
+// study assignments to protect the study counters and experimental dataset.
+
 import api from './api';
 
 export const getPerfectWorkoutReward = async () => {

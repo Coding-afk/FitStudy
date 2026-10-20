@@ -1,3 +1,5 @@
+"""FastAPI application entry point and router registration for FitStudy."""
+
 from fastapi import Depends, FastAPI
 
 from app.core.auth import get_current_user

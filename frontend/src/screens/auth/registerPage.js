@@ -1,3 +1,6 @@
+// New-participant registration screen. It creates the Firebase Auth account,
+// saves the initial profile, and cleans up the Auth user if profile creation fails.
+
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
@@ -35,6 +38,7 @@ export default function RegisterScreen({navigation}) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Keep basic UX validation on-device; Firebase/backend still enforce real constraints.
   const validate = () => {
     const newErrors = {};
     const cleanUsername = username.trim();
@@ -71,6 +75,8 @@ export default function RegisterScreen({navigation}) {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Registration is a two-system operation: create Auth first, then persist the
+  // participant profile. If profile creation fails, remove the new Auth account.
   const handleRegister = async () => {
     if (!validate()) {
       return;

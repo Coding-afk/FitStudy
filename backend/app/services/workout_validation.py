@@ -1,7 +1,11 @@
+"""Validates submitted exercise/set results against the canonical Firestore workout."""
+
 class WorkoutValidationError(ValueError):
     pass
 
 
+# Prevent tampered result payloads by matching exercise IDs, units, set counts,
+# and set numbers against the workout definition stored in Firestore.
 def validate_exercise_results_against_workout(
     exercise_results,
     workout_data: dict,

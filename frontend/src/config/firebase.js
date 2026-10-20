@@ -1,3 +1,6 @@
+// Initializes the Firebase JavaScript SDK for React Native.
+// Firebase Auth persistence keeps a participant signed in across app restarts.
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getApp, getApps, initializeApp } from 'firebase/app';

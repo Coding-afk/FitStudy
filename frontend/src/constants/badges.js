@@ -1,3 +1,6 @@
+// Central badge catalogue used by the frontend. Keeping badge display metadata
+// in one place prevents individual screens from inventing different labels/icons.
+
 export const BADGES = {
   game_on: {
     id: 'game_on',

@@ -1,3 +1,6 @@
+// Bonus Perfect Workout unlocked after all ten study assignments are complete.
+// Its completion is stored separately so it cannot change study counters or leaderboard XP.
+
 import React, {useCallback, useEffect, useState} from 'react';
 
 import {
@@ -199,6 +202,8 @@ function PerfectWorkoutScreen({navigation}) {
     };
   };
 
+  // Bonus completions use the reward endpoint, not workoutResults, so replaying this
+  // workout cannot alter study completion counters, XP, or leaderboard position.
   const saveRewardSession = async () => {
     if (saving) {
       return;

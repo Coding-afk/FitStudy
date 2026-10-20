@@ -1,3 +1,6 @@
+// Shared active-workout header showing workout identity and set completion
+// progress without duplicating this calculation across workout screens.
+
 import React from 'react';
 
 import { StyleSheet, Text, View } from 'react-native';

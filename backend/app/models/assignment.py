@@ -1,3 +1,5 @@
+"""Pydantic contracts for assignment state, condition, and daily challenge responses."""
+
 from datetime import datetime
 from typing import Literal
 
@@ -18,6 +20,7 @@ AssignmentStatus = Literal[
 ]
 
 
+# Challenge metadata returned with gamified assignments.
 class ChallengeInfo(BaseModel):
     id: str
     name: str
@@ -25,6 +28,7 @@ class ChallengeInfo(BaseModel):
     xpReward: int = 50
 
 
+# Complete assignment state exposed to the authenticated frontend.
 class AssignmentResponse(BaseModel):
     assignmentId: str
     userId: str

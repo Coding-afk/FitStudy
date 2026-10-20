@@ -1,3 +1,6 @@
+// Animated modal shown when the backend reports that a new badge was earned.
+// It accepts both legacy badge IDs and newer full badge objects for compatibility.
+
 import React, { useEffect, useRef } from 'react';
 
 import {

@@ -1,8 +1,11 @@
+"""Profile, health-screening, and username request/response models."""
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
+# Exact answer values accepted by the research health-screening form.
 class HealthScreeningData(BaseModel):
     heartCondition: Literal['yes', 'no']
     injury: Literal['yes', 'no']
@@ -36,6 +39,7 @@ class UserProfileCreate(BaseModel):
     participantId: str
 
 
+# Participant-facing profile intentionally excludes sensitive screening answers.
 class UserProfile(BaseModel):
     name: str
     studyId: str

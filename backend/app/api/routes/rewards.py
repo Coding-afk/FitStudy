@@ -1,3 +1,5 @@
+"""Perfect Workout reward endpoints kept separate from study assignment/results data."""
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -43,6 +45,7 @@ def _get_user_id(current_user: dict) -> str:
     return user_id
 
 
+# Reward access is gated by completed study progress so PERFECT001 cannot unlock early.
 def _get_unlocked_user(user_id: str) -> tuple:
     user_ref = db.collection("users").document(user_id)
     user_document = user_ref.get()
@@ -127,6 +130,8 @@ def get_perfect_workout_reward(
 
 
 @router.post("/perfect-workout/complete")
+# Store replay/reward completion separately from workoutResults and gamificationStats.
+# This guarantees that the bonus cannot become an 11th study workout or add XP.
 def complete_perfect_workout_reward(
     result: PerfectWorkoutRewardResultCreate,
     current_user: dict = Depends(get_current_user),

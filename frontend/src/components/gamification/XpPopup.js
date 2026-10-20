@@ -1,3 +1,6 @@
+// Temporary animated XP popup used to give immediate gamified feedback
+// when a participant completes a set or earns a reward.
+
 import React, { useEffect, useRef } from 'react';
 
 import { Animated, StyleSheet, Text } from 'react-native';

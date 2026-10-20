@@ -1,3 +1,6 @@
+// Public entry screen that sends new users to registration and returning users
+// to sign-in. Health screening is completed after a new account is created.
+
 import {
   ScrollView,
   StyleSheet,

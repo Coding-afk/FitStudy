@@ -1,3 +1,6 @@
+// Shared Axios client for all FastAPI requests. The request interceptor waits for
+// Firebase Auth restoration and attaches a fresh ID token to protected API calls.
+
 import axios from 'axios';
 
 import { onAuthStateChanged } from 'firebase/auth';
@@ -18,6 +21,8 @@ const api = axios.create({
 
 let authInitialized = false;
 
+// Firebase restores persisted sessions asynchronously. API requests wait here so
+// a protected request is not sent before the current user/token is available.
 const waitForAuth = async () => {
   if (authInitialized || auth.currentUser) {
     authInitialized = true;
@@ -40,6 +45,7 @@ const waitForAuth = async () => {
   });
 };
 
+// Attach the current Firebase ID token to every outgoing protected request.
 api.interceptors.request.use(
   async config => {
     await waitForAuth();

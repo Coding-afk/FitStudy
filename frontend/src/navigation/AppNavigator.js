@@ -1,3 +1,6 @@
+// Root stack navigation. Route-wrapper components translate navigation params
+// into the simpler props expected by workout and summary screens.
+
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
@@ -18,6 +21,7 @@ import {COLORS} from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
 
+// Route adapters keep navigation-specific params out of reusable workout components.
 function NonGamifiedWorkoutRoute({
   navigation,
   route,

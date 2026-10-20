@@ -1,3 +1,7 @@
+// Countdown control for time-based exercise sets.
+// It plays the completion sound once the timer reaches zero and releases the
+// native sound resource when the component is unmounted.
+
 import React, { useEffect, useRef, useState } from 'react';
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';

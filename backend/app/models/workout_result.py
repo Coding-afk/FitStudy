@@ -1,3 +1,5 @@
+"""Validated workout-result structure shared by gamified and standard sessions."""
+
 from datetime import datetime
 from typing import Literal
 
@@ -22,6 +24,7 @@ class ExerciseResult(BaseModel):
     sets: list[SetResult]
 
 
+# One finished study workout. Exercise/set shape is later checked against Firestore.
 class WorkoutResultCreate(BaseModel):
     assignmentId: str
     workoutId: str

@@ -1,3 +1,6 @@
+// Mandatory post-workout survey. It validates all five ratings and submits only
+// the assignment ID plus ratings; workout condition/user identity are derived server-side.
+
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
@@ -43,6 +46,8 @@ export default function PostWorkoutSurveyScreen({navigation, route, onBack}) {
     });
   };
 
+  // Only rating values and assignmentId are submitted. The backend verifies ownership,
+  // prevents duplicates, derives condition/workoutId, and then completes the assignment.
   const handleSubmit = async () => {
     if (!assignmentId) {
       Alert.alert(

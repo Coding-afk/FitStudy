@@ -1,3 +1,5 @@
+"""Firebase bearer-token verification and optional local development auth bypass."""
+
 import os
 
 from fastapi import (
@@ -113,6 +115,8 @@ def get_development_user() -> dict:
     }
 
 
+# Dependency used by protected routes. In normal mode it verifies the Firebase
+# ID token and returns its decoded claims; the bypass exists only for local testing.
 def get_current_user(
     authorization: str | None = Header(
         default=None

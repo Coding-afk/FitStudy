@@ -1,3 +1,6 @@
+// Workout API wrapper for workout definitions, result submission, and explicit
+// discard/reset of an in-progress assignment.
+
 import api from './api';
 
 export const getAllWorkouts = async () => {
