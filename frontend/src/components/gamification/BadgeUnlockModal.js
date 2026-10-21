@@ -1,3 +1,6 @@
+// Animated modal shown when the backend reports that a new badge was earned.
+// It accepts both legacy badge IDs and newer full badge objects for compatibility.
+
 import React, { useEffect, useRef } from 'react';
 
 import {
@@ -12,19 +15,21 @@ import {
 import BadgeIcon from './BadgeIcon';
 
 import { getBadgeDefinition } from '../../constants/badges';
-
 import { COLORS } from '../../constants/theme';
 
-function BadgeUnlockModal({ visible, badgeId, onClose }) {
+function BadgeUnlockModal({
+  visible,
+  badgeId,
+  badge: legacyBadge,
+  onClose,
+}) {
   const scale = useRef(new Animated.Value(0.6)).current;
-
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!visible) {
       scale.setValue(0.6);
       opacity.setValue(0);
-
       return;
     }
 
@@ -35,7 +40,6 @@ function BadgeUnlockModal({ visible, badgeId, onClose }) {
         tension: 80,
         useNativeDriver: true,
       }),
-
       Animated.timing(opacity, {
         toValue: 1,
         duration: 250,
@@ -44,11 +48,31 @@ function BadgeUnlockModal({ visible, badgeId, onClose }) {
     ]).start();
   }, [visible, scale, opacity]);
 
-  if (!badgeId) {
+  /*
+   * The backend currently returns newlyUnlockedBadges as full
+   * badge objects, while some older frontend code used only IDs.
+   * Support both shapes so the modal never falls back to the
+   * generic "Achievement" placeholder by mistake.
+   */
+  const suppliedBadge =
+    typeof badgeId === 'object' && badgeId !== null
+      ? badgeId
+      : legacyBadge;
+
+  const resolvedBadgeId =
+    typeof badgeId === 'string'
+      ? badgeId
+      : suppliedBadge?.id;
+
+  if (!resolvedBadgeId) {
     return null;
   }
 
-  const badge = getBadgeDefinition(badgeId);
+  const badge = {
+    ...getBadgeDefinition(resolvedBadgeId),
+    ...(suppliedBadge ?? {}),
+    id: resolvedBadgeId,
+  };
 
   return (
     <Modal
@@ -61,15 +85,9 @@ function BadgeUnlockModal({ visible, badgeId, onClose }) {
         <Animated.View
           style={[
             styles.modalCard,
-
             {
               opacity,
-
-              transform: [
-                {
-                  scale,
-                },
-              ],
+              transform: [{ scale }],
             },
           ]}
         >
@@ -77,10 +95,13 @@ function BadgeUnlockModal({ visible, badgeId, onClose }) {
 
           <View style={styles.badgeContainer}>
             <View style={styles.glowLarge} />
-
             <View style={styles.glowSmall} />
 
-            <BadgeIcon badgeId={badgeId} unlocked size={110} />
+            <BadgeIcon
+              badgeId={resolvedBadgeId}
+              unlocked
+              size={110}
+            />
           </View>
 
           <Text style={styles.badgeName}>{badge.name}</Text>
@@ -103,130 +124,87 @@ function BadgeUnlockModal({ visible, badgeId, onClose }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-
     backgroundColor: 'rgba(0, 0, 0, 0.82)',
-
     justifyContent: 'center',
-
     alignItems: 'center',
-
     padding: 24,
   },
 
   modalCard: {
     width: '100%',
-
     maxWidth: 360,
-
     backgroundColor: COLORS.card,
-
     borderRadius: 22,
-
     borderWidth: 1,
-
     borderColor: COLORS.primaryLight,
-
     paddingHorizontal: 24,
-
     paddingTop: 26,
-
     paddingBottom: 22,
-
     alignItems: 'center',
   },
 
   unlockLabel: {
     color: COLORS.primaryLight,
-
     fontSize: 11,
-
     fontWeight: '900',
-
     letterSpacing: 1.5,
-
     marginBottom: 22,
   },
 
   badgeContainer: {
     width: 150,
     height: 150,
-
     justifyContent: 'center',
-
     alignItems: 'center',
-
     marginBottom: 10,
   },
 
   glowLarge: {
     position: 'absolute',
-
     width: 145,
     height: 145,
-
     borderRadius: 73,
-
     backgroundColor: COLORS.primary,
-
     opacity: 0.12,
   },
 
   glowSmall: {
     position: 'absolute',
-
     width: 125,
     height: 125,
-
     borderRadius: 63,
-
     backgroundColor: COLORS.primaryLight,
-
     opacity: 0.12,
   },
 
   badgeName: {
     color: COLORS.text,
-
     fontSize: 24,
-
     fontWeight: '800',
-
     textAlign: 'center',
-
     marginTop: 10,
   },
 
   description: {
     color: COLORS.textSecondary,
-
     fontSize: 13,
-
     lineHeight: 20,
-
     textAlign: 'center',
-
     marginTop: 8,
-
     marginBottom: 24,
   },
 
   continueButton: {
     width: '100%',
-
     backgroundColor: COLORS.primary,
-
     borderRadius: 12,
-
     paddingVertical: 13,
-
     alignItems: 'center',
   },
 
   continueText: {
     color: COLORS.text,
-
     fontSize: 14,
-
     fontWeight: '800',
   },
 });

@@ -1,3 +1,6 @@
+// Active gamified workout flow. It tracks editable set results locally, displays
+// the assigned challenge/XP feedback, saves one validated result, then requires survey.
+
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -21,7 +24,11 @@ import ChallengeCard from '../../components/gamification/ChallengeCard';
 
 import XpPopup from '../../components/gamification/XpPopup';
 
-import { getWorkout, saveWorkoutResult } from '../../services/workouts';
+import {
+  discardAssignment,
+  getWorkout,
+  saveWorkoutResult,
+} from '../../services/workouts';
 
 import { COLORS } from '../../constants/theme';
 
@@ -64,10 +71,11 @@ const getApiErrorMessage = error => {
 };
 
 function GamifiedWorkoutScreen({
-  // TODO:
-  // Replace with Group 1's
-  // workout assignment.
+  assignmentId,
+
   workoutId = 'W001',
+
+  challenge = null,
 
   onCompleteWorkout = () => {},
 
@@ -85,9 +93,13 @@ function GamifiedWorkoutScreen({
 
   const [saving, setSaving] = useState(false);
 
+  const [discarding, setDiscarding] = useState(false);
+
   const [xpPopup, setXpPopup] = useState(null);
 
 
+  // Fetch both assignment/workout data before allowing result editing. The challenge
+  // is persisted on the assignment so leaving/reopening cannot reroll it.
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -219,6 +231,8 @@ function GamifiedWorkoutScreen({
 
   const allSetsCompleted = totalSets > 0 && completedSets === totalSets;
 
+  // Convert the editable UI state into the canonical result/summary shape expected
+  // by the backend and the summary screen.
   const buildSummary = () => {
     if (!workout || !startedAt) {
       return null;
@@ -249,6 +263,8 @@ function GamifiedWorkoutScreen({
     }));
 
     return {
+      assignmentId,
+
       workoutId: workout.workoutId,
 
       workoutName: workout.name,
@@ -269,6 +285,8 @@ function GamifiedWorkoutScreen({
     };
   };
 
+  // Save exactly one workout result. The backend awards gamification and moves the
+  // assignment to survey_pending; study counters wait for survey submission.
   const saveAndCompleteWorkout = async () => {
     if (saving) {
       return;
@@ -287,6 +305,8 @@ function GamifiedWorkoutScreen({
       }
 
       const resultPayload = {
+        assignmentId: summary.assignmentId,
+
         workoutId: summary.workoutId,
 
         condition: summary.condition,
@@ -342,12 +362,36 @@ function GamifiedWorkoutScreen({
     );
   };
 
+  // Discard resets the assignment to assigned but deliberately keeps its challenge
+  // so a participant cannot reroll challenges by repeatedly discarding.
+  const discardAndExitWorkout = async () => {
+    if (discarding || saving) {
+      return;
+    }
+
+    if (!assignmentId) {
+      setSaveError('Unable to discard this workout because the assignment ID is missing.');
+      return;
+    }
+
+    try {
+      setDiscarding(true);
+      setSaveError('');
+
+      await discardAssignment(assignmentId);
+
+      onDiscardWorkout();
+    } catch (error) {
+      setSaveError(getApiErrorMessage(error));
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   const handleDiscardWorkout = () => {
     Alert.alert(
       'Discard Workout',
-
-      'Are you sure you want to discard this workout? Your current workout progress will not be saved.',
-
+      'Are you sure you want to discard this workout? Your current progress will be cleared and the workout will return to Ready status.',
       [
         {
           text: 'Cancel',
@@ -357,8 +401,7 @@ function GamifiedWorkoutScreen({
         {
           text: 'Discard',
           style: 'destructive',
-
-          onPress: onDiscardWorkout,
+          onPress: discardAndExitWorkout,
         },
       ],
     );
@@ -411,7 +454,12 @@ function GamifiedWorkoutScreen({
         <View style={styles.gamePanel}>
           <ProgressRing progress={progress} />
 
-          <ChallengeCard performanceScore={progress} />
+          <ChallengeCard
+            challenge={challenge}
+            completedSets={completedSets}
+            totalSets={totalSets}
+            exerciseList={workout.exerciseList}
+          />
         </View>
 
         {workout.exerciseList.map(exercise => (
@@ -454,10 +502,12 @@ function GamifiedWorkoutScreen({
 
         <Pressable
           style={styles.discardButton}
-          disabled={saving}
+          disabled={saving || discarding}
           onPress={handleDiscardWorkout}
         >
-          <Text style={styles.discardButtonText}>Discard Workout</Text>
+          <Text style={styles.discardButtonText}>
+            {discarding ? 'Discarding...' : 'Discard Workout'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

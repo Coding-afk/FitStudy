@@ -1,3 +1,5 @@
+"""FastAPI application entry point and router registration for FitStudy."""
+
 from fastapi import Depends, FastAPI
 
 from app.core.auth import get_current_user
@@ -13,17 +15,26 @@ from app.api.routes.gamification import (
     router as gamification_router,
 )
 
+from app.api.routes.assignments import (
+    router as assignments_router,
+)
+
+from app.api.routes.rewards import (
+    router as rewards_router,
+)
 
 app = FastAPI(
     title="FitStudy API",
 )
+
 app.include_router(workouts.router)
 app.include_router(workout_results.router)
 app.include_router(survey_response.router)
-app.include_router(
-    gamification_router
-)
+app.include_router(gamification_router)
 app.include_router(profile.router)
+app.include_router(assignments_router)
+app.include_router(rewards_router)
+
 
 @app.get("/health")
 def health():

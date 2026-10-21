@@ -1,3 +1,6 @@
+// Detailed participant gamification/awards screen. Values are read from the
+// backend source of truth rather than recalculated independently on the client.
+
 
 
 import React from 'react';
@@ -20,11 +23,19 @@ export default function GamificationStatsAwardsScreen({ navigation, onBack }) {
   const handleGoBack = () => {
     if (onBack) {
       onBack();
-    } else if (navigation?.goBack) {
-      navigation.goBack();
-    } else if (navigation?.navigate) {
-      navigation.navigate('Home');
+
+      return;
     }
+
+    if (navigation?.canGoBack?.()) {
+      navigation.goBack();
+
+      return;
+    }
+
+    navigation.navigate('MainTabs', {
+      screen: 'Home',
+    });
   };
 
   return (
@@ -43,7 +54,7 @@ export default function GamificationStatsAwardsScreen({ navigation, onBack }) {
 
         {/* Screen Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.screenTitle}>Gamification & Stats</Text>
+          <Text style={styles.screenTitle}>🏆 Level and Badges 🏅</Text>
           <Text style={styles.screenSubtitle}>
             Track your XP progression, workout achievements, and earned badges.
           </Text>

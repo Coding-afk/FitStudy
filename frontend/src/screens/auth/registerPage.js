@@ -1,15 +1,31 @@
+// New-participant registration screen. It creates the Firebase Auth account,
+// saves the initial profile, and cleans up the Auth user if profile creation fails.
+
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+
+import { deleteRegisteredUser, registerUser } from '../../services/auth';
+import { saveProfile } from '../../services/profile';
 import { COLORS } from '../../constants/theme';
+
+const PASSWORD_RULES = [
+  { test: value => value.length >= 8, label: 'at least 8 characters' },
+  { test: value => /[A-Z]/.test(value), label: 'one uppercase letter' },
+  { test: value => /[0-9]/.test(value), label: 'one number' },
+  {
+    test: value => /[^A-Za-z0-9\s]/.test(value),
+    label: 'one special character',
+  },
+];
 
 export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState('');
@@ -18,36 +34,139 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  /**
+   * Perform basic client-side validation for immediate user feedback.
+   *
+   * Firebase and the backend remain responsible for enforcing the actual
+   * authentication and account rules.
+   */
   const validate = () => {
     const newErrors = {};
-    if (!username.trim()) newErrors.username = 'Please enter a username';
-    if (username.trim().length < 3) newErrors.username = 'Username must be at least 3 characters';
-    if (!password) newErrors.password = 'Please enter a password';
-    if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
-    if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    const cleanUsername = username.trim();
+
+    if (!cleanUsername) {
+      newErrors.username = 'Please enter a username';
+    } else if (cleanUsername.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    } else if (cleanUsername.length > 20) {
+      newErrors.username = 'Username must be 20 characters or fewer';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+      newErrors.username = 'Use only letters, numbers and underscores';
+    }
+
+    if (!password) {
+      newErrors.password = 'Please enter a password';
+    } else {
+      const missing = PASSWORD_RULES.filter(rule => !rule.test(password)).map(
+        rule => rule.label,
+      );
+
+      if (missing.length > 0) {
+        newErrors.password = `Password must include ${missing.join(', ')}.`;
+      }
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
   };
 
+  /**
+   * Registration involves two separate systems:
+   *
+   * 1. Firebase Authentication creates the login account.
+   * 2. The FitStudy backend stores the participant profile.
+   *
+   * If Firebase succeeds but profile creation fails, the newly created
+   * Firebase user is removed again. This prevents an orphan Firebase account
+   * from existing without its required FitStudy profile.
+   */
   const handleRegister = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      return;
+    }
+
     setLoading(true);
+    setErrors({});
+
     try {
-      // TODO: connect to Firebase Authentication
-      // For now navigate to onboarding with username as participantId
+      // Firebase creates the authentication account first.
+      const credential = await registerUser(username, password);
+
       const participantId = '#FIT-' + Math.floor(10000 + Math.random() * 90000);
-      navigation.navigate('Onboarding', { participantId, username });
+
+      try {
+        // The backend profile must exist before registration is considered complete.
+        await saveProfile({
+          username: username.trim(),
+          participantId,
+        });
+      } catch (profileError) {
+        /**
+         * Firebase Auth succeeded, but the participant profile did not.
+         * Remove the newly created Auth user to avoid leaving an incomplete account.
+         */
+        try {
+          await deleteRegisteredUser(credential.user);
+        } catch (cleanupError) {
+          console.error(
+            'Failed to clean up incomplete Firebase account:',
+            cleanupError,
+          );
+        }
+
+        // Re-throw the original profile error so normal registration
+        // error handling below can display feedback to the participant.
+        throw profileError;
+      }
+
+      // Registration succeeded, so continue to mandatory health screening.
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Onboarding' }],
+      });
     } catch (error) {
-      Alert.alert('Registration failed', error.message);
+      if (error.code === 'auth/email-already-in-use') {
+        Alert.alert(
+          'Username already taken',
+          'An account with this username already exists. Please choose another username or sign in instead.',
+        );
+        return;
+      }
+
+      if (error.code === 'auth/weak-password') {
+        Alert.alert('Password too weak', 'Please choose a stronger password.');
+        return;
+      }
+
+      if (error.code === 'auth/network-request-failed') {
+        Alert.alert(
+          'Connection error',
+          'Unable to connect. Please check your internet connection and try again.',
+        );
+        return;
+      }
+
+      console.error('Registration failed:', error);
+
+      Alert.alert(
+        'Registration failed',
+        'Something went wrong while creating your account. Please try again.',
+      );
     } finally {
+      // Re-enable the form after either success or failure.
       setLoading(false);
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <View style={styles.logoWrap}>
         <View style={styles.logo}>
           <Text style={styles.logoIcon}>🏃</Text>
@@ -55,12 +174,15 @@ export default function RegisterScreen({ navigation }) {
       </View>
 
       <Text style={styles.title}>Create an account</Text>
+
       <Text style={styles.subtitle}>
-        Your account keeps track of your progress anonymously throughout the study.
+        Create your anonymous account first. You will complete the health
+        screening before entering the study.
       </Text>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Username</Text>
+
         <TextInput
           style={[styles.input, errors.username && styles.inputError]}
           placeholder="Choose a username"
@@ -68,13 +190,19 @@ export default function RegisterScreen({ navigation }) {
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
+          autoCorrect={false}
         />
-        <Text style={styles.hint}>Don't use your real name — keep it anonymous.</Text>
+
+        <Text style={styles.hint}>
+          Don't use your real name — keep it anonymous.
+        </Text>
+
         {errors.username && <Text style={styles.error}>{errors.username}</Text>}
       </View>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Password</Text>
+
         <TextInput
           style={[styles.input, errors.password && styles.inputError]}
           placeholder="Create a password"
@@ -83,12 +211,18 @@ export default function RegisterScreen({ navigation }) {
           onChangeText={setPassword}
           secureTextEntry
         />
-        <Text style={styles.hint}>At least 6 characters.</Text>
+
+        <Text style={styles.hint}>
+          At least 8 characters, with an uppercase letter, a number and a
+          special character.
+        </Text>
+
         {errors.password && <Text style={styles.error}>{errors.password}</Text>}
       </View>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Confirm password</Text>
+
         <TextInput
           style={[styles.input, errors.confirmPassword && styles.inputError]}
           placeholder="Repeat your password"
@@ -97,17 +231,22 @@ export default function RegisterScreen({ navigation }) {
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
-        {errors.confirmPassword && <Text style={styles.error}>{errors.confirmPassword}</Text>}
+
+        {errors.confirmPassword && (
+          <Text style={styles.error}>{errors.confirmPassword}</Text>
+        )}
       </View>
 
       <TouchableOpacity
         style={[styles.btn, loading && styles.btnDisabled]}
         onPress={handleRegister}
-        disabled={loading}>
-        {loading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.btnText}>Create account</Text>
-        }
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.btnText}>Create account</Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.divider}>
@@ -119,7 +258,6 @@ export default function RegisterScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.loginLink}>Sign in instead →</Text>
       </TouchableOpacity>
-
     </ScrollView>
   );
 }
@@ -203,6 +341,7 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     backgroundColor: COLORS.primaryLight,
+    opacity: 0.5,
   },
   btnText: {
     color: COLORS.text,

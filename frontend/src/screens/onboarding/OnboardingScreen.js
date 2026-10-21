@@ -1,98 +1,386 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
-import { useState } from 'react';
-import { COLORS } from '../constants/theme';
+// Health screening and consent flow. The backend evaluates eligibility so a
+// participant cannot bypass warning/blocked rules by changing frontend state alone.
 
-export default function OnboardingScreen({ navigation, route }) {
-  const { participantId } = route.params || {};
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+import { logoutUser } from '../../services/auth';
+import { submitHealthScreening } from '../../services/profile';
+import { COLORS } from '../../constants/theme';
+
+/**
+ * Reusable Yes / No health-screening question.
+ *
+ * This component is defined outside OnboardingScreen so React does not create
+ * a new component type every time the parent screen renders.
+ */
+const ToggleQuestion = ({ question, value, onChange }) => (
+  <View style={styles.questionRow}>
+    <Text style={styles.questionText}>{question}</Text>
+
+    <View style={styles.toggleRow}>
+      <TouchableOpacity
+        style={[styles.toggleBtn, value === 'yes' && styles.toggleActive]}
+        onPress={() => onChange('yes')}
+      >
+        <Text
+          style={[
+            styles.toggleText,
+            value === 'yes' && styles.toggleTextActive,
+          ]}
+        >
+          Yes
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.toggleBtn, value === 'no' && styles.toggleActive]}
+        onPress={() => onChange('no')}
+      >
+        <Text
+          style={[styles.toggleText, value === 'no' && styles.toggleTextActive]}
+        >
+          No
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+/**
+ * Reusable multiple-choice screening question.
+ *
+ * Like ToggleQuestion, this is kept outside the screen component so it is not
+ * recreated as a new React component during every parent render.
+ */
+const OptionQuestion = ({ question, options, value, onChange }) => (
+  <View style={styles.optionSection}>
+    <Text style={styles.questionText}>{question}</Text>
+
+    <View style={styles.optionRow}>
+      {options.map(option => (
+        <TouchableOpacity
+          key={option}
+          style={[styles.optionBtn, value === option && styles.optionBtnActive]}
+          onPress={() => onChange(option)}
+        >
+          <Text
+            style={[
+              styles.optionText,
+              value === option && styles.optionTextActive,
+            ]}
+          >
+            {option}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+export default function OnboardingScreen({ navigation }) {
   const [heartCondition, setHeartCondition] = useState(null);
   const [injury, setInjury] = useState(null);
   const [pregnant, setPregnant] = useState(null);
+  const [asthma, setAsthma] = useState(null);
+  const [medication, setMedication] = useState(null);
+  const [ageRange, setAgeRange] = useState(null);
+  const [fitnessLevel, setFitnessLevel] = useState(null);
+  const [exerciseFrequency, setExerciseFrequency] = useState(null);
 
-  const allAnswered = heartCondition !== null && injury !== null && pregnant !== null;
+  const [loading, setLoading] = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+  const [outcome, setOutcome] = useState(null);
+  const [serverMessage, setServerMessage] = useState('');
+
+  // The participant may only submit once every screening question has an answer.
+  const allAnswered =
+    heartCondition !== null &&
+    injury !== null &&
+    pregnant !== null &&
+    asthma !== null &&
+    medication !== null &&
+    ageRange !== null &&
+    fitnessLevel !== null &&
+    exerciseFrequency !== null;
+
+  /**
+   * Build the request sent to the backend.
+   *
+   * The frontend only collects the answers. The backend remains responsible
+   * for deciding whether the participant is eligible, warned or blocked.
+   */
+  const getScreeningData = () => ({
+    heartCondition,
+    injury,
+    pregnant,
+    asthma,
+    medication,
+    ageRange,
+    fitnessLevel,
+    exerciseFrequency,
+  });
+
+  // Remove the onboarding screen from the back stack after successful screening.
+  const goToHome = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainTabs' }],
+    });
+  };
+
+  /**
+   * Send raw answers to the backend.
+   *
+   * Eligibility/warning/blocked decisions are made server-side so that a user
+   * cannot bypass the study's health-screening rules by modifying client state.
+   */
+  const submitScreening = async warningAcknowledged => {
+    if (!allAnswered) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await submitHealthScreening(
+        getScreeningData(),
+        warningAcknowledged,
+      );
+
+      if (result.outcome === 'eligible') {
+        setShowWarning(false);
+        goToHome();
+        return;
+      }
+
+      // Warning and blocked outcomes are displayed in the modal below.
+      setOutcome(result.outcome);
+      setServerMessage(result.message || '');
+      setShowWarning(true);
+    } catch (error) {
+      console.error('Health screening failed:', error);
+
+      Alert.alert(
+        'Unable to submit screening',
+        error?.response?.data?.detail || error?.message || 'Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinue = () => {
+    submitScreening(false);
+  };
+
+  const handleWarningContinue = () => {
+    submitScreening(true);
+  };
+
+  /**
+   * Blocked participants are signed out before returning to Welcome.
+   *
+   * This ensures an authenticated Firebase session cannot accidentally remain
+   * active after the backend has marked the participant as ineligible.
+   */
+  const handleBlockedReturn = async () => {
+    setShowWarning(false);
+    setLoading(true);
+
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error('Failed to sign out blocked participant:', error);
+    } finally {
+      // Always leave the screening screen, even if Firebase logout itself fails.
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Welcome' }],
+      });
+
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-
       <View style={styles.header}>
         <Text style={styles.title}>Health Screening</Text>
+
         <Text style={styles.subtitle}>
-          Before you begin, we need a few details to keep you safe.
+          Please answer all questions honestly. Your screening is saved against
+          your anonymous participant account and is used to determine study
+          eligibility.
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Please answer all questions</Text>
+        <Text style={styles.cardLabel}>Health conditions</Text>
 
-        <View style={styles.questionRow}>
-          <Text style={styles.questionText}>Do you have any heart conditions?</Text>
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, heartCondition === 'yes' && styles.toggleActive]}
-              onPress={() => setHeartCondition('yes')}>
-              <Text style={[styles.toggleText, heartCondition === 'yes' && styles.toggleTextActive]}>Yes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, heartCondition === 'no' && styles.toggleActive]}
-              onPress={() => setHeartCondition('no')}>
-              <Text style={[styles.toggleText, heartCondition === 'no' && styles.toggleTextActive]}>No</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ToggleQuestion
+          question="Do you have any heart conditions?"
+          value={heartCondition}
+          onChange={setHeartCondition}
+        />
 
         <View style={styles.divider} />
 
-        <View style={styles.questionRow}>
-          <Text style={styles.questionText}>Any joint or muscle injuries?</Text>
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, injury === 'yes' && styles.toggleActive]}
-              onPress={() => setInjury('yes')}>
-              <Text style={[styles.toggleText, injury === 'yes' && styles.toggleTextActive]}>Yes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, injury === 'no' && styles.toggleActive]}
-              onPress={() => setInjury('no')}>
-              <Text style={[styles.toggleText, injury === 'no' && styles.toggleTextActive]}>No</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ToggleQuestion
+          question="Do you currently have an injury that may affect exercise?"
+          value={injury}
+          onChange={setInjury}
+        />
 
         <View style={styles.divider} />
 
-        <View style={styles.questionRow}>
-          <Text style={styles.questionText}>Pregnant or postpartum?</Text>
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, pregnant === 'yes' && styles.toggleActive]}
-              onPress={() => setPregnant('yes')}>
-              <Text style={[styles.toggleText, pregnant === 'yes' && styles.toggleTextActive]}>Yes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, pregnant === 'no' && styles.toggleActive]}
-              onPress={() => setPregnant('no')}>
-              <Text style={[styles.toggleText, pregnant === 'no' && styles.toggleTextActive]}>No</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ToggleQuestion
+          question="Are you currently pregnant?"
+          value={pregnant}
+          onChange={setPregnant}
+        />
+
+        <View style={styles.divider} />
+
+        <ToggleQuestion
+          question="Do you have asthma or another breathing condition?"
+          value={asthma}
+          onChange={setAsthma}
+        />
+
+        <View style={styles.divider} />
+
+        <ToggleQuestion
+          question="Are you currently on medication that affects physical activity?"
+          value={medication}
+          onChange={setMedication}
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>About you</Text>
+
+        <OptionQuestion
+          question="What is your age range?"
+          options={['18-24', '25-34', '35-44', '45+']}
+          value={ageRange}
+          onChange={setAgeRange}
+        />
+
+        <View style={styles.divider} />
+
+        <OptionQuestion
+          question="What is your fitness level?"
+          options={['Beginner', 'Intermediate', 'Advanced']}
+          value={fitnessLevel}
+          onChange={setFitnessLevel}
+        />
+
+        <View style={styles.divider} />
+
+        <OptionQuestion
+          question="How often do you currently exercise?"
+          options={['Never', '1-2x/week', '3-4x/week', '5+/week']}
+          value={exerciseFrequency}
+          onChange={setExerciseFrequency}
+        />
       </View>
 
       <View style={styles.warningCard}>
         <Text style={styles.warningText}>
-          ⚠️ You may stop or withdraw at any time during any workout without penalty.
+          ⚠️ You may stop or withdraw at any time during any workout without
+          penalty.
         </Text>
       </View>
 
       <TouchableOpacity
-        style={[styles.btn, !allAnswered && styles.btnDisabled]}
-        disabled={!allAnswered}
-        onPress={() => {
-          navigation.navigate('WorkoutSelection', { participantId });
-        }}>
-        <Text style={styles.btnText}>Agree and continue</Text>
+        style={[styles.btn, (!allAnswered || loading) && styles.btnDisabled]}
+        disabled={!allAnswered || loading}
+        onPress={handleContinue}
+      >
+        {loading ? (
+          <ActivityIndicator color={COLORS.text} />
+        ) : (
+          <Text style={styles.btnText}>Agree and continue</Text>
+        )}
       </TouchableOpacity>
 
-      <Text style={styles.footerText}>Your data is anonymous and never shared.</Text>
+      <Text style={styles.footerText}>
+        Your screening is linked only to your anonymous participant account.
+      </Text>
 
+      <Modal
+        visible={showWarning}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (outcome !== 'blocked') {
+            setShowWarning(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {outcome === 'blocked' ? (
+              <>
+                <Text style={styles.modalTitle}>Unable to participate</Text>
+
+                <Text style={styles.modalText}>
+                  {serverMessage ||
+                    'Based on your health screening answers, we are unable to include you in this study for your safety.'}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.modalBtnDanger}
+                  onPress={handleBlockedReturn}
+                >
+                  <Text style={styles.modalBtnText}>Return to welcome</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>Please note</Text>
+
+                <Text style={styles.modalText}>
+                  {serverMessage ||
+                    'One or more of your answers may require extra care during physical activity. You may continue after acknowledging this warning.'}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={handleWarningContinue}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={COLORS.text} />
+                  ) : (
+                    <Text style={styles.modalBtnText}>
+                      I understand, continue
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalBtnOutline}
+                  onPress={() => setShowWarning(false)}
+                  disabled={loading}
+                >
+                  <Text style={styles.modalBtnOutlineText}>Go back</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -116,7 +404,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
@@ -172,6 +460,35 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: COLORS.text,
   },
+  optionSection: {
+    paddingVertical: 10,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  optionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.cardSecondary,
+  },
+  optionBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryLight,
+  },
+  optionText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  optionTextActive: {
+    color: COLORS.text,
+  },
   divider: {
     height: 0.5,
     backgroundColor: COLORS.border,
@@ -211,5 +528,63 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 12,
+  },
+  modalText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    padding: 13,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalBtnDanger: {
+    backgroundColor: '#e53e3e',
+    borderRadius: 10,
+    padding: 13,
+    alignItems: 'center',
+  },
+  modalBtnOutline: {
+    borderRadius: 10,
+    padding: 13,
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+  },
+  modalBtnText: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalBtnOutlineText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -1,3 +1,5 @@
+"""Read-only workout-definition endpoints backed by the Firestore workouts collection."""
+
 from fastapi import APIRouter, HTTPException
 
 from app.core.firebase import db
@@ -7,6 +9,8 @@ router = APIRouter(
     tags=["workouts"],
 )
 
+# Public workout definitions are read-only through this router; result writes use
+# /workout-results where authentication and validation are enforced.
 @router.get("")
 def get_all_workouts():
 

@@ -1,3 +1,6 @@
+// Loads the authenticated participant's gamification statistics and presents
+// level progress, XP information, and earned/locked badges in one reusable card.
+
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -25,6 +28,7 @@ function GamificationProfileCard() {
 
   const badges = getAllBadges();
 
+  // Reload stats from the server so the card always reflects awarded XP/badges.
   const loadStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -99,6 +103,18 @@ function GamificationProfileCard() {
   const earnedBadges = Array.isArray(stats.earnedBadges)
     ? stats.earnedBadges
     : [];
+
+  const finalRewardCompleted = Boolean(
+    stats.finalRewardCompleted,
+  );
+
+  const unlockedBadgeCount = badges.filter(badge => {
+    if (badge.id === 'fitstudy_complete') {
+      return finalRewardCompleted;
+    }
+
+    return earnedBadges.includes(badge.id);
+  }).length;
 
   return (
     <View style={styles.container}>
@@ -188,13 +204,16 @@ function GamificationProfileCard() {
         <Text style={styles.heading}>Badges</Text>
 
         <Text style={styles.badgeCount}>
-          {earnedBadges.length}/{badges.length}
+          {unlockedBadgeCount}/{badges.length}
         </Text>
       </View>
 
       <View style={styles.badgeGrid}>
         {badges.map(badge => {
-          const unlocked = earnedBadges.includes(badge.id);
+          const unlocked =
+            badge.id === 'fitstudy_complete'
+              ? finalRewardCompleted
+              : earnedBadges.includes(badge.id);
 
           return (
             <View

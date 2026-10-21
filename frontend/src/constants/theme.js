@@ -1,3 +1,6 @@
+// Shared FitStudy theme values. Screens and components use these constants
+// to keep the dark visual style consistent throughout the application.
+
 export const COLORS = {
   background: '#000000',
 

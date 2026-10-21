@@ -1,3 +1,6 @@
+// Active standard workout flow. It uses the same underlying workout structure
+// as gamified sessions while deliberately omitting gamification-specific feedback.
+
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -14,7 +17,11 @@ import ExerciseCard from '../../components/workouts/ExerciseCard';
 
 import WorkoutHeader from '../../components/workouts/WorkoutHeader';
 
-import { getWorkout, saveWorkoutResult } from '../../services/workouts';
+import {
+  discardAssignment,
+  getWorkout,
+  saveWorkoutResult,
+} from '../../services/workouts';
 
 import { COLORS } from '../../constants/theme';
 
@@ -58,9 +65,8 @@ const getApiErrorMessage = error => {
 };
 
 function NonGamifiedWorkoutScreen({
-  // TODO:
-  // Replace this temporary default with
-  // Group 1's assignment/navigation workoutId.
+  assignmentId,
+
   workoutId = 'W001',
 
   onCompleteWorkout = () => {},
@@ -78,6 +84,8 @@ function NonGamifiedWorkoutScreen({
   const [startedAt, setStartedAt] = useState(null);
 
   const [saving, setSaving] = useState(false);
+
+  const [discarding, setDiscarding] = useState(false);
 
   const loadWorkout = useCallback(async () => {
     try {
@@ -184,6 +192,7 @@ function NonGamifiedWorkoutScreen({
 
   const allSetsCompleted = totalSets > 0 && completedSets === totalSets;
 
+  // Build the same core result shape used by gamified workouts, minus gamification data.
   const buildSummary = () => {
     if (!workout || !startedAt) {
       return null;
@@ -214,6 +223,8 @@ function NonGamifiedWorkoutScreen({
     }));
 
     return {
+      assignmentId,
+
       workoutId: workout.workoutId,
 
       workoutName: workout.name,
@@ -234,6 +245,8 @@ function NonGamifiedWorkoutScreen({
     };
   };
 
+  // Result submission moves the assignment to survey_pending. The next assignment
+  // stays locked until the post-workout survey is submitted.
   const saveAndCompleteWorkout = async () => {
     if (saving) {
       return;
@@ -252,6 +265,8 @@ function NonGamifiedWorkoutScreen({
       }
 
       const resultPayload = {
+        assignmentId: summary.assignmentId,
+
         workoutId: summary.workoutId,
 
         condition: summary.condition,
@@ -299,10 +314,35 @@ function NonGamifiedWorkoutScreen({
     );
   };
 
+  // Discard returns this assignment to assigned so it can be restarted later.
+  const discardAndExitWorkout = async () => {
+    if (discarding || saving) {
+      return;
+    }
+
+    if (!assignmentId) {
+      setSaveError('Unable to discard this workout because the assignment ID is missing.');
+      return;
+    }
+
+    try {
+      setDiscarding(true);
+      setSaveError('');
+
+      await discardAssignment(assignmentId);
+
+      onDiscardWorkout();
+    } catch (error) {
+      setSaveError(getApiErrorMessage(error));
+    } finally {
+      setDiscarding(false);
+    }
+  };
+
   const handleDiscardWorkout = () => {
     Alert.alert(
       'Discard Workout',
-      'Are you sure you want to discard this workout? Your current workout progress will not be saved.',
+      'Are you sure you want to discard this workout? Your current progress will be cleared and the workout will return to Ready status.',
       [
         {
           text: 'Cancel',
@@ -312,8 +352,7 @@ function NonGamifiedWorkoutScreen({
         {
           text: 'Discard',
           style: 'destructive',
-
-          onPress: onDiscardWorkout,
+          onPress: discardAndExitWorkout,
         },
       ],
     );
@@ -399,10 +438,12 @@ function NonGamifiedWorkoutScreen({
 
         <Pressable
           style={styles.discardWorkoutButton}
-          disabled={saving}
+          disabled={saving || discarding}
           onPress={handleDiscardWorkout}
         >
-          <Text style={styles.discardWorkoutText}>Discard Workout</Text>
+          <Text style={styles.discardWorkoutText}>
+            {discarding ? 'Discarding...' : 'Discard Workout'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

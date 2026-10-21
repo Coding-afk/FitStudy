@@ -1,3 +1,6 @@
+// Reusable 1-5 rating control for the post-workout research survey.
+// The selected value is controlled by the parent survey screen.
+
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS } from '../../constants/theme';

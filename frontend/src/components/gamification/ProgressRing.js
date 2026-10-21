@@ -1,3 +1,6 @@
+// Small reusable progress-ring visual used for level/progress feedback.
+// Progress is clamped before rendering so invalid values cannot distort the UI.
+
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';

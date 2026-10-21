@@ -1,147 +1,429 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  Platform,
-  StatusBar,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import {getProfile} from '../../services/profile';
-import { COLORS } from '../../constants/theme';
+// Account/Profile screen. It displays non-sensitive study information and owns
+// sensitive account actions such as username/password changes, logout, and deletion.
 
-export default function ProfileScreen({ user, navigation, route }) {
+import React, {useCallback, useState} from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
+
+import {
+  changeUsername,
+  deleteAccount,
+  getProfile,
+} from '../../services/profile';
+import {
+  changePassword,
+  logoutUser,
+  reauthenticateCurrentUser,
+} from '../../services/auth';
+import {COLORS} from '../../constants/theme';
+
+const PASSWORD_RULES = [
+  {test: value => value.length >= 8, label: 'at least 8 characters'},
+  {test: value => /[A-Z]/.test(value), label: 'one uppercase letter'},
+  {test: value => /[0-9]/.test(value), label: 'one number'},
+  {
+    test: value => /[^A-Za-z0-9\s]/.test(value),
+    label: 'one special character',
+  },
+];
+
+export default function ProfileScreen({navigation, route}) {
   const participantId = route?.params?.participantId ?? null;
 
-  const [profile, setProfile] = useState(user || {});
+  const [profile, setProfile] = useState({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const data = await getProfile();
-        console.log('Profile data received:', data)
-        setProfile(data);
-      } catch (error) {
-        console.error('Failed to load profile:', error);
-        Alert.alert('Error', 'Unable to load your profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProfile();
+  const [usernameModalVisible, setUsernameModalVisible] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [usernamePassword, setUsernamePassword] = useState('');
+  const [changingUsername, setChangingUsername] = useState(false);
+
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Account deletion is deliberately separated from logout. Deleting the
+  // account permanently removes the participant's own study data and Firebase
+  // Authentication account, so it requires password confirmation.
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  // Reload on focus so username/progress changes made elsewhere are reflected here.
+  const loadProfile = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+      Alert.alert('Error', 'Unable to load your profile');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile]),
+  );
+
   const userInfo = {
-    name: profile.name || 'Not assigned',
+    name: profile.name || 'Participant',
     studyId: profile.studyId || participantId || 'Not assigned',
-    group: profile.group || 'Not assigned',
-    completedGamified: profile.completedGamified ?? 0,
-    completedNonGamified: profile.completedNonGamified ?? 0,
+    group: profile.group || 'participant',
+    completedGamified: Number(profile.completedGamified ?? 0),
+    completedNonGamified: Number(profile.completedNonGamified ?? 0),
     totalTarget: 10,
   };
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
-
-  const gamifiedProgress = Math.min(
-    Math.max(userInfo.completedGamified / userInfo.totalTarget, 0),
-    1
+  const completedWorkouts = Math.min(
+    userInfo.totalTarget,
+    Math.max(
+      0,
+      userInfo.completedGamified + userInfo.completedNonGamified,
+    ),
   );
 
-  const nonGamifiedProgress = Math.min(
-    Math.max(userInfo.completedNonGamified / userInfo.totalTarget, 0),
-    1
+  const overallProgress = Math.min(
+    1,
+    Math.max(0, completedWorkouts / userInfo.totalTarget),
   );
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator
-          size="large"
-          color={COLORS.primary}
-        />
-      </View>
-    );
-  }
+  const handleGamificationInfo = () => {
+    navigation.getParent()?.navigate('GamificationStatsAwards');
+  };
 
-const handleGamificationInfo = () => {
-    if (navigation?.navigate) {
-      navigation.navigate('GamificationStatsAwards');
-    } else {
+  const openUsernameModal = () => {
+    setNewUsername(profile.name || '');
+    setUsernamePassword('');
+    setUsernameModalVisible(true);
+  };
+
+  // Username is also the hidden Firebase login identifier. After updating it,
+  // sign out so the next session is created cleanly with the new credential.
+  const performUsernameChange = async cleanUsername => {
+    try {
+      setChangingUsername(true);
+
+      // Username changes also change Firebase's hidden synthetic login email.
+      // Re-authenticate first so a stale session cannot change credentials.
+      await reauthenticateCurrentUser(usernamePassword);
+
+      const updatedProfile = await changeUsername(cleanUsername);
+
+      setProfile(updatedProfile);
+      setUsernameModalVisible(false);
+      setUsernamePassword('');
+
+      // Changing the username also changes the hidden Firebase Auth email on
+      // the backend. Sign out immediately so the next session starts cleanly
+      // with the new username.
+      const rootNavigation = navigation.getParent();
+
+      try {
+        await logoutUser();
+      } finally {
+        rootNavigation?.reset({
+          index: 0,
+          routes: [{name: 'Welcome'}],
+        });
+      }
+
       Alert.alert(
-        'Gamification Info',
-        'GamificationInformation screen navigation target ready for implementation.'
+        'Username changed',
+        `Your username is now ${updatedProfile.name}. Please sign in again using the new username and your current password.`,
       );
+    } catch (error) {
+      console.error('Username change failed:', error);
+
+      const detail = error?.response?.data?.detail;
+
+      if (
+        error?.code === 'auth/invalid-credential' ||
+        error?.code === 'auth/wrong-password'
+      ) {
+        Alert.alert('Incorrect password', 'Your current password is incorrect.');
+      } else if (error?.response?.status === 409) {
+        Alert.alert(
+          'Username unavailable',
+          detail || 'That username is already taken.',
+        );
+      } else {
+        Alert.alert(
+          'Unable to change username',
+          detail || error?.message || 'Please try again.',
+        );
+      }
+    } finally {
+      setChangingUsername(false);
     }
   };
 
-  const handlePasswordReset = () => {
+  const handleChangeUsername = () => {
+    const cleanUsername = newUsername.trim();
+
+    if (!cleanUsername || !usernamePassword) {
+      Alert.alert(
+        'Missing information',
+        'Enter a new username and your current password.',
+      );
+      return;
+    }
+
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(cleanUsername)) {
+      Alert.alert(
+        'Invalid username',
+        'Use 3-20 characters containing only letters, numbers and underscores.',
+      );
+      return;
+    }
+
+    if (cleanUsername.toLowerCase() === String(profile.name || '').toLowerCase()) {
+      Alert.alert('Choose a new username', 'Enter a different username.');
+      return;
+    }
+
     Alert.alert(
-      'Password Reset',
-      'A password reset link has been sent to your registered email.'
+      'Change username?',
+      'Changing your username will sign you out. You will need to sign in again using your new username and current password.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Change Username',
+          onPress: () => performUsernameChange(cleanUsername),
+        },
+      ],
+    );
+  };
+
+  const openPasswordModal = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordModalVisible(true);
+  };
+
+  // Password changes use Firebase reauthentication and never store the password
+  // in Firestore or send it to the FitStudy backend.
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Missing information', 'Please complete all password fields.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords do not match', 'Please confirm your new password.');
+      return;
+    }
+
+    const missing = PASSWORD_RULES.filter(rule => !rule.test(newPassword)).map(
+      rule => rule.label,
+    );
+
+    if (missing.length > 0) {
+      Alert.alert(
+        'Invalid password',
+        `Your new password must include ${missing.join(', ')}.`,
+      );
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      Alert.alert(
+        'Choose a new password',
+        'Your new password must be different from your current password.',
+      );
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      await changePassword(currentPassword, newPassword);
+      setPasswordModalVisible(false);
+      Alert.alert('Success', 'Your password has been changed successfully.');
+    } catch (error) {
+      console.error('Password change failed:', error);
+
+      if (
+        error?.code === 'auth/invalid-credential' ||
+        error?.code === 'auth/wrong-password'
+      ) {
+        Alert.alert('Incorrect password', 'Your current password is incorrect.');
+      } else {
+        Alert.alert(
+          'Unable to change password',
+          error?.message || 'Please try again.',
+        );
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const openDeleteModal = () => {
+    setDeletePassword('');
+    setDeleteModalVisible(true);
+  };
+
+  // Reauthenticate first, then let the backend delete participant-owned study data
+  // and the matching Firebase Auth account as one protected account action.
+  const performAccountDeletion = async () => {
+    try {
+      setDeletingAccount(true);
+
+      // Re-authentication proves that the person holding the unlocked phone
+      // knows the current password before a destructive account operation.
+      await reauthenticateCurrentUser(deletePassword);
+
+      // The backend removes only participant-owned records. Shared workout
+      // definitions are intentionally preserved for the rest of the study.
+      await deleteAccount();
+
+      setDeleteModalVisible(false);
+      setDeletePassword('');
+
+      // The backend deletes the Firebase Auth account. signOut() clears the
+      // local Firebase session so App.js immediately returns to the guest flow.
+      try {
+        await logoutUser();
+      } catch (logoutError) {
+        // A deleted Firebase account can invalidate the local session before
+        // signOut finishes. The navigation reset below is still safe.
+        console.warn('Local sign-out after account deletion:', logoutError);
+      }
+
+      navigation.getParent()?.reset({
+        index: 0,
+        routes: [{name: 'Welcome'}],
+      });
+
+      Alert.alert(
+        'Account deleted',
+        'Your FitStudy account and participant data have been permanently deleted.',
+      );
+    } catch (error) {
+      console.error('Account deletion failed:', error);
+
+      const detail = error?.response?.data?.detail;
+
+      if (
+        error?.code === 'auth/invalid-credential' ||
+        error?.code === 'auth/wrong-password'
+      ) {
+        Alert.alert('Incorrect password', 'Your current password is incorrect.');
+      } else {
+        Alert.alert(
+          'Unable to delete account',
+          detail || error?.message || 'Please try again.',
+        );
+      }
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  // Destructive action requires an explicit second confirmation before execution.
+  const handleDeleteAccount = () => {
+    if (!deletePassword) {
+      Alert.alert(
+        'Password required',
+        'Enter your current password before deleting your account.',
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Permanently delete account?',
+      'This cannot be undone. Your profile, health screening, workout assignments, workout results, surveys, gamification data and reward records will be deleted.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: performAccountDeletion,
+        },
+      ],
     );
   };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
+      {text: 'Cancel', style: 'cancel'},
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: () => {
-          navigation.getParent()?.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'Onboarding',
-              },
-            ],
-          });
+        onPress: async () => {
+          try {
+            await logoutUser();
+            navigation.getParent()?.reset({
+              index: 0,
+              routes: [{name: 'Welcome'}],
+            });
+          } catch (error) {
+            console.error('Logout failed:', error);
+            Alert.alert('Logout failed', 'Please try again.');
+          }
         },
       },
     ]);
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.welcomeTitle}>Welcome, {userInfo.name}!</Text>
-        <Text style={styles.subtitle}>FitStudy Research Profile</Text>
-      </View>
-
-      {/* Study Information */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Study Information</Text>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Participant ID:</Text>
-          <Text style={styles.infoValue}>{userInfo.studyId}</Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.welcomeTitle}>Welcome, {userInfo.name}!</Text>
+          <Text style={styles.subtitle}>FitStudy Research Profile</Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Assigned Cohort:</Text>
-          <Text style={styles.infoValue}>{userInfo.group}</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Study Information</Text>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Participant ID:</Text>
+            <Text style={styles.infoValue}>{userInfo.studyId}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Study role:</Text>
+            <Text style={styles.infoValue}>{userInfo.group}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* Overall Workout Completion */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Overall Workout Completion</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Overall Workout Completion</Text>
 
-        <View style={styles.progressGroup}>
           <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Gamified Workouts</Text>
+            <Text style={styles.progressLabel}>Completed Workouts</Text>
             <Text style={styles.progressValue}>
-              {userInfo.completedGamified} / {userInfo.totalTarget}
+              {completedWorkouts} / {userInfo.totalTarget}
             </Text>
           </View>
 
@@ -149,87 +431,250 @@ const handleGamificationInfo = () => {
             <View
               style={[
                 styles.progressBarFill,
-                {
-                  width: `${gamifiedProgress * 100}%`,
-                  backgroundColor: COLORS.primary,
-                },
+                {width: `${overallProgress * 100}%`},
               ]}
             />
           </View>
+
+          <Text style={styles.progressNote}>
+            {completedWorkouts === userInfo.totalTarget
+              ? 'All study workouts completed.'
+              : `${userInfo.totalTarget - completedWorkouts} workouts remaining`}
+          </Text>
         </View>
 
-        <View style={styles.progressGroup}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Non-Gamified Workouts</Text>
-            <Text style={styles.progressValue}>
-              {userInfo.completedNonGamified} / {userInfo.totalTarget}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>🏆 Awards and Badges Details 🏅</Text>
+          <TouchableOpacity style={styles.button} onPress={handleGamificationInfo}>
+            <Text style={styles.buttonText}>🔥 View Awards & Badges 🔥</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Settings & Preferences</Text>
+
+          <TouchableOpacity style={styles.button} onPress={openUsernameModal}>
+            <Text style={styles.buttonText}>Change Username</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.button} onPress={openPasswordModal}>
+            <Text style={styles.buttonText}>Change Password</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.logoutButton]}
+            onPress={handleLogout}
+          >
+            <Text style={[styles.buttonText, styles.logoutText]}>Log Out</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.deleteAccountButton]}
+            onPress={openDeleteModal}
+          >
+            <Text style={[styles.buttonText, styles.deleteAccountText]}>
+              Delete Account
             </Text>
-          </View>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-          <View style={styles.progressBarBackground}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${nonGamifiedProgress * 100}%`,
-                  backgroundColor: COLORS.primaryLight,
-                },
-              ]}
+      <Modal
+        visible={usernameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUsernameModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Username</Text>
+
+            <Text style={styles.modalDescription}>
+              Your username is what you use to sign in and what appears on the leaderboard.
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="New username"
+              placeholderTextColor={COLORS.textSecondary}
+              value={newUsername}
+              onChangeText={setNewUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
             />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Current password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={usernamePassword}
+              onChangeText={setUsernamePassword}
+              secureTextEntry
+            />
+
+            <Text style={styles.passwordHint}>
+              Usernames use 3-20 letters, numbers or underscores.
+            </Text>
+
+            <View style={styles.usernameWarning}>
+              <Text style={styles.usernameWarningTitle}>You will be signed out</Text>
+              <Text style={styles.usernameWarningText}>
+                After changing your username, sign in again using the new username and your current password.
+              </Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setUsernameModalVisible(false)}
+                disabled={changingUsername}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleChangeUsername}
+                disabled={changingUsername}
+              >
+                {changingUsername ? (
+                  <ActivityIndicator color={COLORS.text} />
+                ) : (
+                  <Text style={styles.buttonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
+      </Modal>
 
-      {/* Gamification Information Entry Point */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Gamification Details</Text>
-        <TouchableOpacity style={styles.button} onPress={handleGamificationInfo}>
-          <Text style={styles.buttonText}>View Gamification Information</Text>
-        </TouchableOpacity>
-      </View>
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
 
-      {/* Settings & Preferences */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Settings & Preferences</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Current password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+            />
 
-        <View style={styles.settingRow}>
-          <Text style={styles.infoLabel}>Notifications</Text>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{
-              false: COLORS.border,
-              true: COLORS.primary,
-            }}
-            thumbColor={COLORS.text}
-          />
+            <TextInput
+              style={styles.input}
+              placeholder="New password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm new password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+
+            <Text style={styles.passwordHint}>
+              Use at least 8 characters, including an uppercase letter, a number
+              and a special character.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setPasswordModalVisible(false)}
+                disabled={changingPassword}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleChangePassword}
+                disabled={changingPassword}
+              >
+                {changingPassword ? (
+                  <ActivityIndicator color={COLORS.text} />
+                ) : (
+                  <Text style={styles.buttonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
+      </Modal>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.infoLabel}>High Contrast Text</Text>
-          <Switch
-            value={highContrast}
-            onValueChange={setHighContrast}
-            trackColor={{
-              false: COLORS.border,
-              true: COLORS.primary,
-            }}
-            thumbColor={COLORS.text}
-          />
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deletingAccount) {
+            setDeleteModalVisible(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Delete Account</Text>
+
+            <Text style={styles.deleteWarningTitle}>
+              This action is permanent
+            </Text>
+            <Text style={styles.modalDescription}>
+              Deleting your account removes your participant profile, health
+              screening, assignments, workout results, surveys, gamification
+              data and reward history. Shared FitStudy workout definitions are
+              not affected.
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Current password"
+              placeholderTextColor={COLORS.textSecondary}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              secureTextEntry
+              editable={!deletingAccount}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deletingAccount}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteModalButton]}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color={COLORS.text} />
+                ) : (
+                  <Text style={styles.deleteModalButtonText}>Delete Account</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-
-        <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
-          <Text style={styles.buttonText}>Reset Password</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.logoutButton]}
-          onPress={handleLogout}
-        >
-          <Text style={[styles.buttonText, styles.logoutText]}>Log Out</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </Modal>
+    </View>
   );
 }
 
@@ -238,34 +683,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 30,
     paddingTop:
       Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 50,
   },
-
   headerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
-
   welcomeTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: COLORS.text,
     textAlign: 'center',
   },
-
   subtitle: {
     fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginTop: 4,
   },
-
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 12,
@@ -274,72 +720,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.text,
     marginBottom: 14,
   },
-
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 6,
   },
-
   infoLabel: {
     fontSize: 14,
     color: COLORS.textSecondary,
   },
-
   infoValue: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.text,
   },
-
-  progressGroup: {
-    marginVertical: 10,
-  },
-
   progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-
   progressLabel: {
     fontSize: 14,
     color: COLORS.text,
     fontWeight: '500',
   },
-
   progressValue: {
     fontSize: 14,
     color: COLORS.textSecondary,
     fontWeight: '600',
   },
-
   progressBarBackground: {
     height: 12,
     backgroundColor: COLORS.cardSecondary,
     borderRadius: 6,
     overflow: 'hidden',
   },
-
   progressBarFill: {
     height: '100%',
     borderRadius: 6,
+    backgroundColor: COLORS.primary,
   },
-
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+  progressNote: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginTop: 8,
+    textAlign: 'right',
   },
-
   button: {
     backgroundColor: COLORS.cardSecondary,
     paddingVertical: 12,
@@ -349,19 +781,118 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   buttonText: {
     color: COLORS.text,
     fontWeight: '600',
     fontSize: 14,
   },
-
   logoutButton: {
     backgroundColor: '#3A1E1E',
     borderColor: '#722F2F',
   },
-
   logoutText: {
     color: '#FF8080',
+  },
+  deleteAccountButton: {
+    backgroundColor: '#4A1717',
+    borderColor: '#A43A3A',
+  },
+  deleteAccountText: {
+    color: '#FFB0B0',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginBottom: 16,
+  },
+  modalDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    padding: 12,
+    color: COLORS.text,
+    backgroundColor: COLORS.cardSecondary,
+    marginBottom: 10,
+  },
+  passwordHint: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  usernameWarning: {
+    backgroundColor: COLORS.cardSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  usernameWarningTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  usernameWarningText: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  modalCancelButton: {
+    backgroundColor: COLORS.cardSecondary,
+    borderColor: COLORS.border,
+  },
+  modalSaveButton: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryLight,
+  },
+  deleteWarningTitle: {
+    color: '#FF8080',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  deleteModalButton: {
+    backgroundColor: '#6B1F1F',
+    borderColor: '#A43A3A',
+  },
+  deleteModalButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

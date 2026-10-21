@@ -1,3 +1,7 @@
+// Countdown control for time-based exercise sets.
+// It plays the completion sound once the timer reaches zero and releases the
+// native sound resource when the component is unmounted.
+
 import React, { useEffect, useRef, useState } from 'react';
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -6,7 +10,7 @@ import Sound from 'react-native-sound';
 
 import { COLORS } from '../../constants/theme';
 
-Sound.setCategory('Playback');
+Sound.setCategory('Playback', true);
 
 function CountdownTimer({ targetSeconds }) {
   const [seconds, setSeconds] = useState(targetSeconds);
@@ -27,6 +31,7 @@ function CountdownTimer({ targetSeconds }) {
           return;
         }
 
+        sound.setVolume(1.0);
         soundRef.current = sound;
       },
     );
@@ -45,12 +50,22 @@ function CountdownTimer({ targetSeconds }) {
   }, [targetSeconds]);
 
   const playFinishedSound = () => {
-    if (!soundRef.current) {
+    const sound = soundRef.current;
+
+    if (!sound) {
+      console.log('Timer sound is not loaded yet.');
       return;
     }
 
-    soundRef.current.stop(() => {
-      soundRef.current.play();
+    // Do not call stop() before the first play. On some Android builds the
+    // stop callback is not fired when the clip is already stopped, which
+    // means play() never runs. Seek to the beginning and play directly.
+    sound.setCurrentTime(0);
+    sound.setVolume(1.0);
+    sound.play(success => {
+      if (!success) {
+        console.log('Timer sound playback failed.');
+      }
     });
   };
 

@@ -1,3 +1,6 @@
+// Standard workout summary. It derives a concise completed-set/time overview
+// from the saved workout result and can expand to show individual exercise sets.
+
 import React, { useState } from 'react';
 
 import {

@@ -1,3 +1,5 @@
+// Gamification API wrapper for authenticated participant statistics and leaderboard data.
+
 import api from './api';
 
 export const getMyGamificationStats = async () => {

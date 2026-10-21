@@ -1,3 +1,7 @@
+// Presents one exercise and its sets during an active workout.
+// Set changes are delegated to the parent workout screen so there is a single
+// source of truth for the workout result that will later be submitted.
+
 import React from 'react';
 
 import { StyleSheet, Text, View } from 'react-native';

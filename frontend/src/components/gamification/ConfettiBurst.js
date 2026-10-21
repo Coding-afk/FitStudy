@@ -1,3 +1,6 @@
+// Lightweight celebration animation used after gamification milestones.
+// The component owns only the visual effect and does not change study/gamification data.
+
 import { useEffect, useRef } from 'react';
 
 import { Animated, Dimensions, StyleSheet, View } from 'react-native';

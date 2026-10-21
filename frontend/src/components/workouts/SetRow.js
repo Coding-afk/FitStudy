@@ -1,3 +1,6 @@
+// Renders one workout set, including value controls, completion state, and
+// a countdown timer when the exercise unit is seconds rather than repetitions.
+
 import React from 'react';
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';

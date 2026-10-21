@@ -1,3 +1,5 @@
+"""Authenticated gamification statistics and leaderboard endpoints."""
+
 import hashlib
 
 from fastapi import (
@@ -29,11 +31,12 @@ router = APIRouter(
 # LEVEL PROGRESS
 # ============================================================
 
+# Convert raw XP into values the frontend can render safely, including the max level.
 def calculate_level_progress(
     total_xp: int,
 ) -> dict:
     current_level = LEVELS[0]
-    next_level = None
+    current_index = 0
 
     for index, level in enumerate(
         LEVELS
@@ -43,19 +46,19 @@ def calculate_level_progress(
             >= level["minimumXP"]
         ):
             current_level = level
-
-            if (
-                index + 1
-                < len(LEVELS)
-            ):
-                next_level = (
-                    LEVELS[index + 1]
-                )
-
+            current_index = index
         else:
             break
 
-    if next_level is None:
+
+    # ========================================================
+    # MAX LEVEL
+    # ========================================================
+
+    if (
+        current_index
+        == len(LEVELS) - 1
+    ):
         return {
             "levelStartXP":
                 current_level[
@@ -72,6 +75,18 @@ def calculate_level_progress(
                 100,
         }
 
+
+    # ========================================================
+    # NORMAL LEVEL PROGRESS
+    # ========================================================
+
+    next_level = (
+        LEVELS[
+            current_index + 1
+        ]
+    )
+
+
     level_start = (
         current_level[
             "minimumXP"
@@ -84,14 +99,17 @@ def calculate_level_progress(
         ]
     )
 
+
     xp_in_level = (
-        total_xp - level_start
+        total_xp
+        - level_start
     )
 
     level_range = (
         next_level_xp
         - level_start
     )
+
 
     progress = round(
         (
@@ -100,6 +118,7 @@ def calculate_level_progress(
         )
         * 100
     )
+
 
     return {
         "levelStartXP":
@@ -134,14 +153,10 @@ def create_player_alias(
     user_id: str,
 ) -> str:
     """
-    Creates a stable anonymous player
-    name from the Firebase UID.
+    Fallback display name used only when a user profile
+    does not contain a username.
 
-    The UID itself is NEVER returned
-    to the frontend.
-
-    Example:
-        Player 428391
+    The Firebase UID itself is never returned.
     """
 
     digest = hashlib.sha256(
@@ -158,6 +173,45 @@ def create_player_alias(
 
     return (
         f"Player {number:06d}"
+    )
+
+
+# Prefer the current Firestore username; retain the anonymous alias only as a
+# fallback for legacy/incomplete development records.
+def get_leaderboard_name(
+    user_id: str,
+) -> str:
+    """
+    Returns the participant's chosen FitStudy username.
+
+    Falls back to the stable Player xxxxxx alias for old
+    accounts that do not yet have a username field.
+    """
+
+    user_document = (
+        db.collection("users")
+        .document(user_id)
+        .get()
+    )
+
+    if user_document.exists:
+        user_data = (
+            user_document.to_dict()
+            or {}
+        )
+
+        username = user_data.get(
+            "username"
+        )
+
+        if (
+            isinstance(username, str)
+            and username.strip()
+        ):
+            return username.strip()
+
+    return create_player_alias(
+        user_id
     )
 
 
@@ -215,9 +269,27 @@ def get_my_gamification_stats(
         )
     )
 
+    user_document = (
+        db.collection("users")
+        .document(user_id)
+        .get()
+    )
+
+    user_data = (
+        user_document.to_dict()
+        if user_document.exists
+        else {}
+    ) or {}
+
     return {
         **stats,
         **level_progress,
+        "finalRewardCompleted": bool(
+            user_data.get(
+                "finalRewardCompleted",
+                False,
+            )
+        ),
     }
 
 
@@ -226,6 +298,7 @@ def get_my_gamification_stats(
 # ============================================================
 
 @router.get("/leaderboard")
+# Build leaderboard rows from server-owned XP data rather than trusting client scores.
 def get_leaderboard(
     limit: int = Query(
         default=25,
@@ -282,7 +355,7 @@ def get_leaderboard(
                 user_id,
 
             "alias":
-                create_player_alias(
+                get_leaderboard_name(
                     user_id
                 ),
 
@@ -327,7 +400,7 @@ def get_leaderboard(
                 current_user_id,
 
             "alias":
-                create_player_alias(
+                get_leaderboard_name(
                     current_user_id
                 ),
 

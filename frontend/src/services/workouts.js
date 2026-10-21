@@ -1,3 +1,6 @@
+// Workout API wrapper for workout definitions, result submission, and explicit
+// discard/reset of an in-progress assignment.
+
 import api from './api';
 
 export const getAllWorkouts = async () => {
@@ -19,3 +22,9 @@ export const saveWorkoutResult = async result => {
 };
 
 
+
+export const discardAssignment = async assignmentId => {
+  const response = await api.post(`/assignments/${assignmentId}/discard`);
+
+  return response.data;
+};

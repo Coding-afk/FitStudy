@@ -1,28 +1,30 @@
-import { StyleSheet, Text } from 'react-native';
+// Main authenticated tab shell. Only participant-facing destinations that are
+// part of the final study experience are exposed here.
 
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import {StyleSheet, Text} from 'react-native';
+
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 
 import WorkoutSelectionScreen from '../screens/home/WorkoutSelectionScreen';
-
 import LeaderboardScreen from '../screens/leaderboard/LeaderboardScreen';
-
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import {COLORS} from '../constants/theme';
 
 const Tab = createBottomTabNavigator();
 
-function HomeIcon({ focused }) {
-  return <Text style={focused ? styles.iconActive : styles.icon}>⌂</Text>;
+function HomeIcon({focused}) {
+  return <Text style={focused ? styles.iconActive : styles.icon}>🏠</Text>;
 }
 
-function LeaderboardIcon({ focused }) {
+function LeaderboardIcon({focused}) {
   return <Text style={focused ? styles.iconActive : styles.icon}>🏆</Text>;
 }
 
-function AccountIcon({ focused }) {
+function AccountIcon({focused}) {
   return <Text style={focused ? styles.iconActive : styles.icon}>👤</Text>;
 }
 
-function MainTabs({ route }) {
+function MainTabs({route}) {
   const participantId = route.params?.participantId ?? null;
 
   return (
@@ -30,25 +32,17 @@ function MainTabs({ route }) {
       initialRouteName="Home"
       screenOptions={{
         headerShown: false,
-
-        tabBarActiveTintColor: '#3b82f6',
-
-        tabBarInactiveTintColor: '#888888',
-
+        tabBarActiveTintColor: COLORS.primaryLight,
+        tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-
-          borderTopColor: '#dddddd',
-
+          backgroundColor: COLORS.card,
+          borderTopColor: COLORS.border,
           height: 65,
-
           paddingTop: 5,
-
           paddingBottom: 7,
         },
-
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '500',
         },
       }}
@@ -56,31 +50,21 @@ function MainTabs({ route }) {
       <Tab.Screen
         name="Home"
         component={WorkoutSelectionScreen}
-        initialParams={{
-          participantId,
-        }}
-        options={{
-          tabBarIcon: HomeIcon,
-        }}
+        initialParams={{participantId}}
+        options={{tabBarIcon: HomeIcon}}
       />
 
       <Tab.Screen
         name="Leaderboard"
         component={LeaderboardScreen}
-        options={{
-          tabBarIcon: LeaderboardIcon,
-        }}
+        options={{tabBarIcon: LeaderboardIcon}}
       />
 
       <Tab.Screen
         name="Account"
         component={ProfileScreen}
-        initialParams={{
-          participantId,
-        }}
-        options={{
-          tabBarIcon: AccountIcon,
-        }}
+        initialParams={{participantId}}
+        options={{tabBarIcon: AccountIcon}}
       />
     </Tab.Navigator>
   );
@@ -88,13 +72,12 @@ function MainTabs({ route }) {
 
 const styles = StyleSheet.create({
   icon: {
-    fontSize: 20,
-    color: '#aaaaaa',
+    fontSize: 19,
+    color: COLORS.textSecondary,
   },
-
   iconActive: {
-    fontSize: 20,
-    color: '#3b82f6',
+    fontSize: 19,
+    color: COLORS.primaryLight,
   },
 });
 
