@@ -23,7 +23,8 @@ backend/.pytest_cache/
 .env
 backend/.env
 frontend/.env
-backend/secrets/
+backend/secrets/*
+!backend/secrets/.gitkeep
 backend/serviceAccountKey.json
 *service-account*.json
 *firebase-admin*.json
@@ -38,3 +39,11 @@ backend/serviceAccountKey.json
 # =========================
 Thumbs.db
 .DS_Store
+
+
+frontend/android/hs_err_pid*.log
+frontend/android/replay_pid*.log
+
+frontend/.expo/
+
+frontend/android/app/google-services.json
