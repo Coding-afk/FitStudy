@@ -1,7 +1,7 @@
 // Health screening and consent flow. The backend evaluates eligibility so a
 // participant cannot bypass warning/blocked rules by changing frontend state alone.
 
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,11 +13,81 @@ import {
   View,
 } from 'react-native';
 
-import {logoutUser} from '../../services/auth';
-import {submitHealthScreening} from '../../services/profile';
-import {COLORS} from '../../constants/theme';
+import { logoutUser } from '../../services/auth';
+import { submitHealthScreening } from '../../services/profile';
+import { COLORS } from '../../constants/theme';
 
-export default function OnboardingScreen({navigation}) {
+/**
+ * Reusable Yes / No health-screening question.
+ *
+ * This component is defined outside OnboardingScreen so React does not create
+ * a new component type every time the parent screen renders.
+ */
+const ToggleQuestion = ({ question, value, onChange }) => (
+  <View style={styles.questionRow}>
+    <Text style={styles.questionText}>{question}</Text>
+
+    <View style={styles.toggleRow}>
+      <TouchableOpacity
+        style={[styles.toggleBtn, value === 'yes' && styles.toggleActive]}
+        onPress={() => onChange('yes')}
+      >
+        <Text
+          style={[
+            styles.toggleText,
+            value === 'yes' && styles.toggleTextActive,
+          ]}
+        >
+          Yes
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.toggleBtn, value === 'no' && styles.toggleActive]}
+        onPress={() => onChange('no')}
+      >
+        <Text
+          style={[styles.toggleText, value === 'no' && styles.toggleTextActive]}
+        >
+          No
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+/**
+ * Reusable multiple-choice screening question.
+ *
+ * Like ToggleQuestion, this is kept outside the screen component so it is not
+ * recreated as a new React component during every parent render.
+ */
+const OptionQuestion = ({ question, options, value, onChange }) => (
+  <View style={styles.optionSection}>
+    <Text style={styles.questionText}>{question}</Text>
+
+    <View style={styles.optionRow}>
+      {options.map(option => (
+        <TouchableOpacity
+          key={option}
+          style={[styles.optionBtn, value === option && styles.optionBtnActive]}
+          onPress={() => onChange(option)}
+        >
+          <Text
+            style={[
+              styles.optionText,
+              value === option && styles.optionTextActive,
+            ]}
+          >
+            {option}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+);
+
+export default function OnboardingScreen({ navigation }) {
   const [heartCondition, setHeartCondition] = useState(null);
   const [injury, setInjury] = useState(null);
   const [pregnant, setPregnant] = useState(null);
@@ -32,6 +102,7 @@ export default function OnboardingScreen({navigation}) {
   const [outcome, setOutcome] = useState(null);
   const [serverMessage, setServerMessage] = useState('');
 
+  // The participant may only submit once every screening question has an answer.
   const allAnswered =
     heartCondition !== null &&
     injury !== null &&
@@ -42,6 +113,12 @@ export default function OnboardingScreen({navigation}) {
     fitnessLevel !== null &&
     exerciseFrequency !== null;
 
+  /**
+   * Build the request sent to the backend.
+   *
+   * The frontend only collects the answers. The backend remains responsible
+   * for deciding whether the participant is eligible, warned or blocked.
+   */
   const getScreeningData = () => ({
     heartCondition,
     injury,
@@ -53,15 +130,20 @@ export default function OnboardingScreen({navigation}) {
     exerciseFrequency,
   });
 
+  // Remove the onboarding screen from the back stack after successful screening.
   const goToHome = () => {
     navigation.reset({
       index: 0,
-      routes: [{name: 'MainTabs'}],
+      routes: [{ name: 'MainTabs' }],
     });
   };
 
-  // Send raw answers to the backend; eligibility/warning/blocked decisions must
-  // be made server-side so they cannot be bypassed by editing the client.
+  /**
+   * Send raw answers to the backend.
+   *
+   * Eligibility/warning/blocked decisions are made server-side so that a user
+   * cannot bypass the study's health-screening rules by modifying client state.
+   */
   const submitScreening = async warningAcknowledged => {
     if (!allAnswered) {
       return;
@@ -81,6 +163,7 @@ export default function OnboardingScreen({navigation}) {
         return;
       }
 
+      // Warning and blocked outcomes are displayed in the modal below.
       setOutcome(result.outcome);
       setServerMessage(result.message || '');
       setShowWarning(true);
@@ -89,9 +172,7 @@ export default function OnboardingScreen({navigation}) {
 
       Alert.alert(
         'Unable to submit screening',
-        error?.response?.data?.detail ||
-          error?.message ||
-          'Please try again.',
+        error?.response?.data?.detail || error?.message || 'Please try again.',
       );
     } finally {
       setLoading(false);
@@ -106,8 +187,12 @@ export default function OnboardingScreen({navigation}) {
     submitScreening(true);
   };
 
-  // Blocked participants are signed out before returning to Welcome so an
-  // authenticated session cannot accidentally continue into the study.
+  /**
+   * Blocked participants are signed out before returning to Welcome.
+   *
+   * This ensures an authenticated Firebase session cannot accidentally remain
+   * active after the backend has marked the participant as ineligible.
+   */
   const handleBlockedReturn = async () => {
     setShowWarning(false);
     setLoading(true);
@@ -117,75 +202,15 @@ export default function OnboardingScreen({navigation}) {
     } catch (error) {
       console.error('Failed to sign out blocked participant:', error);
     } finally {
-      // Always leave the screening screen. Previously this reset only
-      // happened when logout failed, so a successful logout could leave
-      // the participant visually stuck on Health Screening.
+      // Always leave the screening screen, even if Firebase logout itself fails.
       navigation.reset({
         index: 0,
-        routes: [{name: 'Welcome'}],
+        routes: [{ name: 'Welcome' }],
       });
 
       setLoading(false);
     }
   };
-
-  const ToggleQuestion = ({question, value, onChange}) => (
-    <View style={styles.questionRow}>
-      <Text style={styles.questionText}>{question}</Text>
-
-      <View style={styles.toggleRow}>
-        <TouchableOpacity
-          style={[styles.toggleBtn, value === 'yes' && styles.toggleActive]}
-          onPress={() => onChange('yes')}>
-          <Text
-            style={[
-              styles.toggleText,
-              value === 'yes' && styles.toggleTextActive,
-            ]}>
-            Yes
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleBtn, value === 'no' && styles.toggleActive]}
-          onPress={() => onChange('no')}>
-          <Text
-            style={[
-              styles.toggleText,
-              value === 'no' && styles.toggleTextActive,
-            ]}>
-            No
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const OptionQuestion = ({question, options, value, onChange}) => (
-    <View style={styles.optionSection}>
-      <Text style={styles.questionText}>{question}</Text>
-
-      <View style={styles.optionRow}>
-        {options.map(option => (
-          <TouchableOpacity
-            key={option}
-            style={[
-              styles.optionBtn,
-              value === option && styles.optionBtnActive,
-            ]}
-            onPress={() => onChange(option)}>
-            <Text
-              style={[
-                styles.optionText,
-                value === option && styles.optionTextActive,
-              ]}>
-              {option}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -280,7 +305,8 @@ export default function OnboardingScreen({navigation}) {
       <TouchableOpacity
         style={[styles.btn, (!allAnswered || loading) && styles.btnDisabled]}
         disabled={!allAnswered || loading}
-        onPress={handleContinue}>
+        onPress={handleContinue}
+      >
         {loading ? (
           <ActivityIndicator color={COLORS.text} />
         ) : (
@@ -300,7 +326,8 @@ export default function OnboardingScreen({navigation}) {
           if (outcome !== 'blocked') {
             setShowWarning(false);
           }
-        }}>
+        }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {outcome === 'blocked' ? (
@@ -314,7 +341,8 @@ export default function OnboardingScreen({navigation}) {
 
                 <TouchableOpacity
                   style={styles.modalBtnDanger}
-                  onPress={handleBlockedReturn}>
+                  onPress={handleBlockedReturn}
+                >
                   <Text style={styles.modalBtnText}>Return to welcome</Text>
                 </TouchableOpacity>
               </>
@@ -330,7 +358,8 @@ export default function OnboardingScreen({navigation}) {
                 <TouchableOpacity
                   style={styles.modalBtn}
                   onPress={handleWarningContinue}
-                  disabled={loading}>
+                  disabled={loading}
+                >
                   {loading ? (
                     <ActivityIndicator color={COLORS.text} />
                   ) : (
@@ -343,7 +372,8 @@ export default function OnboardingScreen({navigation}) {
                 <TouchableOpacity
                   style={styles.modalBtnOutline}
                   onPress={() => setShowWarning(false)}
-                  disabled={loading}>
+                  disabled={loading}
+                >
                   <Text style={styles.modalBtnOutlineText}>Go back</Text>
                 </TouchableOpacity>
               </>

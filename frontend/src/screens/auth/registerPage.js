@@ -1,7 +1,7 @@
 // New-participant registration screen. It creates the Firebase Auth account,
 // saves the initial profile, and cleans up the Auth user if profile creation fails.
 
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,32 +13,33 @@ import {
   View,
 } from 'react-native';
 
-import {
-  deleteRegisteredUser,
-  registerUser,
-} from '../../services/auth';
-import {saveProfile} from '../../services/profile';
-import {COLORS} from '../../constants/theme';
+import { deleteRegisteredUser, registerUser } from '../../services/auth';
+import { saveProfile } from '../../services/profile';
+import { COLORS } from '../../constants/theme';
 
 const PASSWORD_RULES = [
-  {test: value => value.length >= 8, label: 'at least 8 characters'},
-  {test: value => /[A-Z]/.test(value), label: 'one uppercase letter'},
-  {test: value => /[0-9]/.test(value), label: 'one number'},
+  { test: value => value.length >= 8, label: 'at least 8 characters' },
+  { test: value => /[A-Z]/.test(value), label: 'one uppercase letter' },
+  { test: value => /[0-9]/.test(value), label: 'one number' },
   {
     test: value => /[^A-Za-z0-9\s]/.test(value),
     label: 'one special character',
   },
 ];
 
-export default function RegisterScreen({navigation}) {
-
+export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Keep basic UX validation on-device; Firebase/backend still enforce real constraints.
+  /**
+   * Perform basic client-side validation for immediate user feedback.
+   *
+   * Firebase and the backend remain responsible for enforcing the actual
+   * authentication and account rules.
+   */
   const validate = () => {
     const newErrors = {};
     const cleanUsername = username.trim();
@@ -72,11 +73,20 @@ export default function RegisterScreen({navigation}) {
     }
 
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
   };
 
-  // Registration is a two-system operation: create Auth first, then persist the
-  // participant profile. If profile creation fails, remove the new Auth account.
+  /**
+   * Registration involves two separate systems:
+   *
+   * 1. Firebase Authentication creates the login account.
+   * 2. The FitStudy backend stores the participant profile.
+   *
+   * If Firebase succeeds but profile creation fails, the newly created
+   * Firebase user is removed again. This prevents an orphan Firebase account
+   * from existing without its required FitStudy profile.
+   */
   const handleRegister = async () => {
     if (!validate()) {
       return;
@@ -85,19 +95,38 @@ export default function RegisterScreen({navigation}) {
     setLoading(true);
     setErrors({});
 
-    let createdUser = null;
-
     try {
+      // Firebase creates the authentication account first.
       const credential = await registerUser(username, password);
-      createdUser = credential.user;
 
       const participantId = '#FIT-' + Math.floor(10000 + Math.random() * 90000);
 
-      await saveProfile({
-        username: username.trim(),
-        participantId,
-      });
+      try {
+        // The backend profile must exist before registration is considered complete.
+        await saveProfile({
+          username: username.trim(),
+          participantId,
+        });
+      } catch (profileError) {
+        /**
+         * Firebase Auth succeeded, but the participant profile did not.
+         * Remove the newly created Auth user to avoid leaving an incomplete account.
+         */
+        try {
+          await deleteRegisteredUser(credential.user);
+        } catch (cleanupError) {
+          console.error(
+            'Failed to clean up incomplete Firebase account:',
+            cleanupError,
+          );
+        }
 
+        // Re-throw the original profile error so normal registration
+        // error handling below can display feedback to the participant.
+        throw profileError;
+      }
+
+      // Registration succeeded, so continue to mandatory health screening.
       navigation.reset({
         index: 0,
         routes: [{ name: 'Onboarding' }],
@@ -130,6 +159,9 @@ export default function RegisterScreen({navigation}) {
         'Registration failed',
         'Something went wrong while creating your account. Please try again.',
       );
+    } finally {
+      // Re-enable the form after either success or failure.
+      setLoading(false);
     }
   };
 
@@ -150,6 +182,7 @@ export default function RegisterScreen({navigation}) {
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Username</Text>
+
         <TextInput
           style={[styles.input, errors.username && styles.inputError]}
           placeholder="Choose a username"
@@ -159,14 +192,17 @@ export default function RegisterScreen({navigation}) {
           autoCapitalize="none"
           autoCorrect={false}
         />
+
         <Text style={styles.hint}>
           Don't use your real name — keep it anonymous.
         </Text>
+
         {errors.username && <Text style={styles.error}>{errors.username}</Text>}
       </View>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Password</Text>
+
         <TextInput
           style={[styles.input, errors.password && styles.inputError]}
           placeholder="Create a password"
@@ -175,15 +211,18 @@ export default function RegisterScreen({navigation}) {
           onChangeText={setPassword}
           secureTextEntry
         />
+
         <Text style={styles.hint}>
           At least 8 characters, with an uppercase letter, a number and a
           special character.
         </Text>
+
         {errors.password && <Text style={styles.error}>{errors.password}</Text>}
       </View>
 
       <View style={styles.inputWrap}>
         <Text style={styles.label}>Confirm password</Text>
+
         <TextInput
           style={[styles.input, errors.confirmPassword && styles.inputError]}
           placeholder="Repeat your password"
@@ -192,6 +231,7 @@ export default function RegisterScreen({navigation}) {
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
+
         {errors.confirmPassword && (
           <Text style={styles.error}>{errors.confirmPassword}</Text>
         )}
